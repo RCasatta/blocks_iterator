@@ -112,8 +112,8 @@ impl Reorder {
             match received {
                 Some(block_extra) => {
                     debug!("reorder received {}", block_extra.block_hash);
-                    if count % 20_000 == 0 {
-                        info!("reorder size: {}", self.blocks.0.len())
+                    if count % 10_000 == 0 {
+                        info!("reorder size: {} next: {}", self.blocks.0.len(), self.next)
                     }
                     count += 1;
                     self.blocks.add(block_extra);
