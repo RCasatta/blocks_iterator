@@ -42,7 +42,7 @@ impl OutOfOrderBlocks {
         &self,
         hash: &BlockHash,
         n: u8,
-        mut first_next: Option<BlockHash>,
+        first_next: &mut Option<BlockHash>,
     ) -> bool {
         if let Some(block) = self.0.get(hash) {
             for next in block.next.iter() {
@@ -50,7 +50,7 @@ impl OutOfOrderBlocks {
                     true
                 } else {
                     if first_next.is_none() {
-                        first_next = Some(*next)
+                        *first_next = Some(*next)
                     }
                     self.exist_and_has_n_following(next, n - 1, first_next)
                 };
@@ -60,11 +60,11 @@ impl OutOfOrderBlocks {
     }
 
     fn remove(&mut self, hash: &BlockHash) -> Option<BlockExtra> {
-        let next = None;
-        if self.exist_and_has_n_following(hash, 3, next) {
-            let mut value = self.0.remove(hash).unwrap();
+        let mut next = None;
+        if self.exist_and_has_n_following(hash, 3, &mut next) {
+            let value = self.0.remove(hash).unwrap();
             if value.next.len() > 1 {
-                value.next = vec![next.unwrap()];
+                info!("after {} had a fork to {:?}", value.block_hash, value.next);
             }
             Some(value)
         } else {
