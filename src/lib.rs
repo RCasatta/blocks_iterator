@@ -1,0 +1,100 @@
+use bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut, Txid};
+use log::info;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+use std::sync::mpsc::{sync_channel, SyncSender};
+use std::thread;
+use std::thread::JoinHandle;
+use std::time::Instant;
+use structopt::StructOpt;
+
+mod fee;
+mod parse;
+mod read;
+mod reorder;
+
+#[derive(StructOpt, Debug, Clone)]
+pub struct Config {
+    #[structopt(short, long, default_value = "~/.bitcoin/")]
+    pub blocks_dir: PathBuf,
+
+    /// Network (bitcoin, testnet, regtest, signet)
+    #[structopt(short, long)]
+    pub network: bitcoin::Network,
+}
+
+#[derive(Debug)]
+pub struct BlockExtra {
+    pub block: Block,
+    pub block_hash: BlockHash,
+    pub block_bytes: Vec<u8>,
+    pub next: Vec<BlockHash>, // vec cause in case of reorg could be more than one
+    pub size: u32,
+    pub height: u32,
+    pub outpoint_values: HashMap<OutPoint, TxOut>,
+    pub tx_hashes: HashSet<Txid>,
+}
+
+impl BlockExtra {
+    pub fn average_fee(&self) -> f64 {
+        self.fee() as f64 / self.block.txdata.len() as f64
+    }
+
+    pub fn fee(&self) -> u64 {
+        let mut total = 0u64;
+        for tx in self.block.txdata.iter() {
+            total += self.tx_fee(tx);
+        }
+        total
+    }
+
+    pub fn tx_fee(&self, tx: &Transaction) -> u64 {
+        let output_total: u64 = tx.output.iter().map(|el| el.value).sum();
+        let mut input_total = 0u64;
+        for input in tx.input.iter() {
+            match self.outpoint_values.get(&input.previous_output) {
+                Some(txout) => input_total += txout.value,
+                None => panic!("can't find tx fee {}", tx.txid()),
+            }
+        }
+        input_total - output_total
+    }
+}
+
+pub fn iterate(config: Config, channels: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {
+    let handle = thread::spawn(move || {
+        let now = Instant::now();
+
+        let (send_blobs, receive_blobs) = sync_channel(1);
+
+        let mut read = read::Read::new(config.blocks_dir.clone(), send_blobs);
+        let read_handle = thread::spawn(move || {
+            read.start();
+        });
+
+        let (send_blocks, receive_blocks) = sync_channel(1_000);
+        let mut parse = parse::Parse::new(config.network, receive_blobs, send_blocks);
+        let parse_handle = thread::spawn(move || {
+            parse.start();
+        });
+
+        let (send_ordered_blocks, receive_ordered_blocks) = sync_channel(100);
+        let mut reorder =
+            reorder::Reorder::new(config.network, receive_blocks, send_ordered_blocks);
+        let orderer_handle = thread::spawn(move || {
+            reorder.start();
+        });
+
+        let mut fee = fee::Fee::new(receive_ordered_blocks, channels);
+        let fee_handle = thread::spawn(move || {
+            fee.start();
+        });
+
+        read_handle.join().unwrap();
+        parse_handle.join().unwrap();
+        orderer_handle.join().unwrap();
+        fee_handle.join().unwrap();
+        info!("Total time elapsed: {}s", now.elapsed().as_secs());
+    });
+    handle
+}
