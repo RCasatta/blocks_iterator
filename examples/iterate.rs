@@ -1,15 +1,13 @@
-use bitcoin::Network;
 use blocks_iterator::Config;
 use env_logger::Env;
 use log::{info, debug};
 use std::sync::mpsc::sync_channel;
+use structopt::StructOpt;
 
 fn main() {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
-    let config = Config {
-        blocks_dir: "/Volumes/Transcend/bitcoin-testnet/testnet3/blocks".into(),
-        network: Network::Testnet,
-    };
+
+    let config = Config::from_args();
 
     let (send, recv) = sync_channel(1);
 

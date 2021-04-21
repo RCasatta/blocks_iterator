@@ -15,7 +15,7 @@ mod reorder;
 
 #[derive(StructOpt, Debug, Clone)]
 pub struct Config {
-    #[structopt(short, long, default_value = "~/.bitcoin/")]
+    #[structopt(short, long)]
     pub blocks_dir: PathBuf,
 
     /// Network (bitcoin, testnet, regtest, signet)

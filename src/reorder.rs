@@ -6,6 +6,7 @@ use log::{debug, info};
 use std::collections::hash_map::Iter;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
+use std::time::Instant;
 
 pub struct Reorder {
     receiver: Receiver<Option<BlockExtra>>,
@@ -102,8 +103,10 @@ impl Reorder {
     }
 
     pub fn start(&mut self) {
+        let mut busy_time = 0u128;
         loop {
             let received = self.receiver.recv().expect("cannot receive blob");
+            let now = Instant::now();
             match received {
                 Some(block_extra) => {
                     debug!("reorder received {}", block_extra.block_hash);
@@ -114,6 +117,8 @@ impl Reorder {
                 }
                 None => break,
             }
+            busy_time += now.elapsed().as_nanos();
+
         }
         for (key, value) in self.blocks.iter() {
             info!(
@@ -122,6 +127,6 @@ impl Reorder {
             );
         }
         self.sender.send(None).expect("reorder cannot send none");
-        info!("ending reorder");
+        info!("ending reorder, busy time(*): {}", busy_time);
     }
 }
