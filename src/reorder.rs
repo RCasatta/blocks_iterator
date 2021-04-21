@@ -16,25 +16,40 @@ pub struct Reorder {
     blocks: OutOfOrderBlocks,
 }
 
-struct OutOfOrderBlocks(FxHashMap<BlockHash, BlockExtra>, u8);
+struct OutOfOrderBlocks {
+    blocks: FxHashMap<BlockHash, BlockExtra>,
+    follows: FxHashMap<BlockHash, Vec<BlockHash>>,
+    max_reorg: u8,
+}
 
 impl OutOfOrderBlocks {
     fn new(max_reorg: u8) -> Self {
-        OutOfOrderBlocks(FxHashMap::default(), max_reorg)
+        OutOfOrderBlocks {
+            blocks: FxHashMap::default(),
+            follows: FxHashMap::default(),
+            max_reorg,
+        }
     }
 
     fn add(&mut self, mut block_extra: BlockExtra) {
         let prev_hash = block_extra.block.header.prev_blockhash;
-        for (key, value) in self.0.iter() {
-            if value.block.header.prev_blockhash == block_extra.block_hash {
-                block_extra.next.push(*key);
+        self.follows
+            .entry(prev_hash)
+            .and_modify(|e| e.push(block_extra.block_hash))
+            .or_insert(vec![block_extra.block_hash]);
+
+        if let Some(follows) = self.follows.remove(&block_extra.block_hash) {
+            // TODO should be removed?
+            for el in follows {
+                block_extra.next.push(el);
             }
         }
-        if let Some(prev_block) = self.0.get_mut(&prev_hash) {
+
+        if let Some(prev_block) = self.blocks.get_mut(&prev_hash) {
             prev_block.next.push(block_extra.block_hash);
         }
 
-        self.0.insert(block_extra.block_hash, block_extra);
+        self.blocks.insert(block_extra.block_hash, block_extra);
     }
 
     /// check the block identified by `hash` has at least `n` blocks after, to be sure it's not a reorged block
@@ -45,7 +60,7 @@ impl OutOfOrderBlocks {
         n: u8,
         first_next: &mut Option<BlockHash>,
     ) -> bool {
-        if let Some(block) = self.0.get(hash) {
+        if let Some(block) = self.blocks.get(hash) {
             for next in block.next.iter() {
                 return if n == 0 {
                     true
@@ -62,8 +77,8 @@ impl OutOfOrderBlocks {
 
     fn remove(&mut self, hash: &BlockHash) -> Option<BlockExtra> {
         let mut next = None;
-        if self.exist_and_has_n_following(hash, self.1, &mut next) {
-            let value = self.0.remove(hash).unwrap();
+        if self.exist_and_has_n_following(hash, self.max_reorg, &mut next) {
+            let value = self.blocks.remove(hash).unwrap();
             if value.next.len() > 1 {
                 info!("after {} had a fork to {:?}", value.block_hash, value.next);
             }
@@ -74,7 +89,7 @@ impl OutOfOrderBlocks {
     }
 
     fn iter(&self) -> Iter<'_, BlockHash, BlockExtra> {
-        self.0.iter()
+        self.blocks.iter()
     }
 }
 
@@ -113,7 +128,11 @@ impl Reorder {
                 Some(block_extra) => {
                     debug!("reorder received {}", block_extra.block_hash);
                     if count % 10_000 == 0 {
-                        info!("reorder size: {} next: {}", self.blocks.0.len(), self.next)
+                        info!(
+                            "reorder size: {} next: {}",
+                            self.blocks.blocks.len(),
+                            self.next
+                        )
                     }
                     count += 1;
                     self.blocks.add(block_extra);

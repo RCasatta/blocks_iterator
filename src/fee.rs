@@ -1,4 +1,5 @@
 use crate::BlockExtra;
+use bitcoin::hashes::hex::FromHex;
 use bitcoin::hashes::Hash;
 use bitcoin::{OutPoint, Script, Transaction, TxOut, Txid};
 use fxhash::FxHashMap;
@@ -7,7 +8,6 @@ use std::convert::TryInto;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::time::Instant;
-use bitcoin::hashes::hex::FromHex;
 
 pub struct Fee {
     skip_prevout: bool,
@@ -40,8 +40,17 @@ impl Utxo {
         );
         if prev.is_some() {
             // pre bip-34 issue, coinbase without height may create the same hash
-            if txid != Txid::from_hex("d5d27987d2a3dfc724e359870c6644b40e497bdc0589a033220fe15429d88599").unwrap() &&
-                txid != Txid::from_hex("e3bf3d07d4b0375638d5f1db5255fe07ba2c4cb067cd81b84ee974b6585fb468").unwrap() {
+            if txid
+                != Txid::from_hex(
+                    "d5d27987d2a3dfc724e359870c6644b40e497bdc0589a033220fe15429d88599",
+                )
+                .unwrap()
+                && txid
+                    != Txid::from_hex(
+                        "e3bf3d07d4b0375638d5f1db5255fe07ba2c4cb067cd81b84ee974b6585fb468",
+                    )
+                    .unwrap()
+            {
                 panic!("truncated hash caused a collision {}", txid);
             }
         }
