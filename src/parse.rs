@@ -1,7 +1,7 @@
 use crate::BlockExtra;
 use bitcoin::consensus::{deserialize, Decodable};
-use bitcoin::{Block, Network};
-use log::{error, info};
+use bitcoin::{Block, BlockHash, Network};
+use log::{error, info, warn};
 use std::collections::{HashMap, HashSet};
 use std::io::{Cursor, Seek, SeekFrom};
 use std::sync::mpsc::{Receiver, SyncSender};
@@ -9,6 +9,7 @@ use std::time::Instant;
 
 pub struct Parse {
     network: Network,
+    seen: HashSet<BlockHash>,
     receiver: Receiver<Option<Vec<u8>>>,
     sender: SyncSender<Option<BlockExtra>>,
 }
@@ -21,6 +22,7 @@ impl Parse {
     ) -> Parse {
         Parse {
             network,
+            seen: HashSet::new(),
             sender,
             receiver,
         }
@@ -36,6 +38,7 @@ impl Parse {
             match received {
                 Some(blob) => {
                     let blocks_vec = parse_blocks(self.network.magic(), blob);
+
                     total_blocks += blocks_vec.len();
                     info!(
                         "This blob contain {} blocks (total {})",
@@ -44,7 +47,12 @@ impl Parse {
                     );
                     busy_time = busy_time + now.elapsed().as_nanos();
                     for block in blocks_vec {
-                        self.sender.send(Some(block)).unwrap();
+                        if !self.seen.contains(&block.block_hash) {
+                            self.seen.insert(block.block_hash);
+                            self.sender.send(Some(block)).unwrap();
+                        } else {
+                            warn!("duplicate block {}", block.block_hash);
+                        }
                     }
                 }
                 None => break,

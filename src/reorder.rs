@@ -2,8 +2,7 @@ use crate::BlockExtra;
 use bitcoin::blockdata::constants::genesis_block;
 use bitcoin::{BlockHash, Network};
 use fxhash::FxHashMap;
-use log::{debug, info};
-use std::collections::hash_map::Iter;
+use log::{debug, info, warn};
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::time::Instant;
@@ -39,7 +38,6 @@ impl OutOfOrderBlocks {
             .or_insert(vec![block_extra.block_hash]);
 
         if let Some(follows) = self.follows.remove(&block_extra.block_hash) {
-            // TODO should be removed?
             for el in follows {
                 block_extra.next.push(el);
             }
@@ -57,39 +55,34 @@ impl OutOfOrderBlocks {
     fn exist_and_has_n_following(
         &self,
         hash: &BlockHash,
-        n: u8,
-        first_next: &mut Option<BlockHash>,
-    ) -> bool {
+        path: Vec<BlockHash>,
+    ) -> Option<BlockHash> {
+
         if let Some(block) = self.blocks.get(hash) {
             for next in block.next.iter() {
-                return if n == 0 {
-                    true
+                return if path.len() == self.max_reorg as usize {
+                    Some(path[0])
                 } else {
-                    if first_next.is_none() {
-                        *first_next = Some(*next)
-                    }
-                    self.exist_and_has_n_following(next, n - 1, first_next)
+                    let mut path = path.clone();
+                    path.push(*next);
+                    self.exist_and_has_n_following(next, path)
                 };
             }
         }
-        false
+        None
     }
 
     fn remove(&mut self, hash: &BlockHash) -> Option<BlockExtra> {
-        let mut next = None;
-        if self.exist_and_has_n_following(hash, self.max_reorg, &mut next) {
-            let value = self.blocks.remove(hash).unwrap();
+        if let Some(next) = self.exist_and_has_n_following(hash,  vec![]) {
+            let mut value = self.blocks.remove(hash).unwrap();
             if value.next.len() > 1 {
-                info!("after {} had a fork to {:?}", value.block_hash, value.next);
+                warn!("at {} fork to {:?} took {}", value.block_hash, value.next, next);
             }
+            value.next = vec![next];
             Some(value)
         } else {
             None
         }
-    }
-
-    fn iter(&self) -> Iter<'_, BlockHash, BlockExtra> {
-        self.blocks.iter()
     }
 }
 
@@ -144,16 +137,16 @@ impl Reorder {
             }
             busy_time += now.elapsed().as_nanos();
         }
-        for (key, value) in self.blocks.iter() {
-            info!(
-                "not connected: # {:7} hash {} prev {} next {:?}",
-                value.height, key, value.block.header.prev_blockhash, value.next
-            );
-        }
-        self.sender.send(None).expect("reorder cannot send none");
+        info!(
+            "ending reorder next:{} #elements:{} #follows:{}",
+            self.next,
+            self.blocks.blocks.len(),
+            self.blocks.follows.len()
+        );
         info!(
             "ending reorder, busy time(*): {}",
             busy_time / 1_000_000_000
         );
+        self.sender.send(None).expect("reorder cannot send none");
     }
 }
