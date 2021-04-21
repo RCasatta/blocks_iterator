@@ -21,15 +21,24 @@ pub struct Config {
     /// Network (bitcoin, testnet, regtest, signet)
     #[structopt(short, long)]
     pub network: bitcoin::Network,
+
+    /// Skip calculation of previous outputs, it's faster and it uses much less memory
+    /// however make it impossible calculate fees or access tx input previous scripts
+    #[structopt(short, long)]
+    pub skip_prevout: bool,
+
+    /// Maximum length of a reorg allowed, during reordering send block to the next step only
+    /// if it has `max_reorg` following blocks. Higher is more conservative, while lower faster
+    #[structopt(short, long, default_value = "3")]
+    pub max_reorg: u8,
 }
 
 #[derive(Debug)]
 pub struct BlockExtra {
     pub block: Block,
     pub block_hash: BlockHash,
-    pub block_bytes: Vec<u8>,
+    pub block_bytes: Box<[u8]>,
     pub next: Vec<BlockHash>, // vec cause in case of reorg could be more than one
-    pub size: u32,
     pub height: u32,
     pub outpoint_values: HashMap<OutPoint, TxOut>,
     pub tx_hashes: HashSet<Txid>,
@@ -79,13 +88,17 @@ pub fn iterate(config: Config, channels: SyncSender<Option<BlockExtra>>) -> Join
         });
 
         let (send_ordered_blocks, receive_ordered_blocks) = sync_channel(100);
-        let mut reorder =
-            reorder::Reorder::new(config.network, receive_blocks, send_ordered_blocks);
+        let mut reorder = reorder::Reorder::new(
+            config.network,
+            config.max_reorg,
+            receive_blocks,
+            send_ordered_blocks,
+        );
         let orderer_handle = thread::spawn(move || {
             reorder.start();
         });
 
-        let mut fee = fee::Fee::new(receive_ordered_blocks, channels);
+        let mut fee = fee::Fee::new(config.skip_prevout, receive_ordered_blocks, channels);
         let fee_handle = thread::spawn(move || {
             fee.start();
         });

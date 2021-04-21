@@ -81,12 +81,11 @@ fn parse_blocks(magic: u32, blob: Vec<u8>) -> Vec<BlockExtra> {
         match deserialize::<Block>(&blob[start..end]) {
             Ok(block) => {
                 let block_hash = block.block_hash();
-                let block_bytes = blob[start..end].to_vec();
+                let block_bytes = blob[start..end].to_vec().into_boxed_slice();
                 blocks.push(BlockExtra {
                     block,
                     block_hash,
                     block_bytes,
-                    size,
                     height: 0,
                     next: vec![],
                     outpoint_values: HashMap::new(),

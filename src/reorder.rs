@@ -16,11 +16,11 @@ pub struct Reorder {
     blocks: OutOfOrderBlocks,
 }
 
-struct OutOfOrderBlocks(FxHashMap<BlockHash, BlockExtra>);
+struct OutOfOrderBlocks(FxHashMap<BlockHash, BlockExtra>, u8);
 
 impl OutOfOrderBlocks {
-    fn new() -> Self {
-        OutOfOrderBlocks(FxHashMap::default())
+    fn new(max_reorg: u8) -> Self {
+        OutOfOrderBlocks(FxHashMap::default(), max_reorg)
     }
 
     fn add(&mut self, mut block_extra: BlockExtra) {
@@ -62,7 +62,7 @@ impl OutOfOrderBlocks {
 
     fn remove(&mut self, hash: &BlockHash) -> Option<BlockExtra> {
         let mut next = None;
-        if self.exist_and_has_n_following(hash, 3, &mut next) {
+        if self.exist_and_has_n_following(hash, self.1, &mut next) {
             let value = self.0.remove(hash).unwrap();
             if value.next.len() > 1 {
                 info!("after {} had a fork to {:?}", value.block_hash, value.next);
@@ -81,6 +81,7 @@ impl OutOfOrderBlocks {
 impl Reorder {
     pub fn new(
         network: Network,
+        max_reorg: u8,
         receiver: Receiver<Option<BlockExtra>>,
         sender: SyncSender<Option<BlockExtra>>,
     ) -> Reorder {
@@ -89,7 +90,7 @@ impl Reorder {
             receiver,
             height: 0,
             next: genesis_block(network).block_hash(),
-            blocks: OutOfOrderBlocks::new(),
+            blocks: OutOfOrderBlocks::new(max_reorg),
         }
     }
 
@@ -104,12 +105,17 @@ impl Reorder {
 
     pub fn start(&mut self) {
         let mut busy_time = 0u128;
+        let mut count = 0u32;
         loop {
             let received = self.receiver.recv().expect("cannot receive blob");
             let now = Instant::now();
             match received {
                 Some(block_extra) => {
                     debug!("reorder received {}", block_extra.block_hash);
+                    if count % 20_000 == 0 {
+                        info!("reorder size: {}", self.blocks.0.len())
+                    }
+                    count += 1;
                     self.blocks.add(block_extra);
                     while let Some(block_to_send) = self.blocks.remove(&self.next) {
                         self.send(block_to_send);
@@ -118,7 +124,6 @@ impl Reorder {
                 None => break,
             }
             busy_time += now.elapsed().as_nanos();
-
         }
         for (key, value) in self.blocks.iter() {
             info!(
@@ -127,6 +132,9 @@ impl Reorder {
             );
         }
         self.sender.send(None).expect("reorder cannot send none");
-        info!("ending reorder, busy time(*): {}", busy_time);
+        info!(
+            "ending reorder, busy time(*): {}",
+            busy_time / 1_000_000_000
+        );
     }
 }
