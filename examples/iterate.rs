@@ -1,7 +1,7 @@
 use bitcoin::Network;
 use blocks_iterator::Config;
 use env_logger::Env;
-use log::info;
+use log::{info, debug};
 use std::sync::mpsc::sync_channel;
 
 fn main() {
@@ -18,12 +18,17 @@ fn main() {
     loop {
         let received = recv.recv().expect("cannot receive blob");
         match received {
-            Some(block_extra) => info!(
-                "# {:7} {} {:10}",
-                block_extra.height,
-                block_extra.block_hash,
-                block_extra.fee()
-            ),
+            Some(block_extra) => {
+                debug!(
+                    "# {:7} {} {:10}",
+                    block_extra.height,
+                    block_extra.block_hash,
+                    block_extra.fee()
+                );
+                if block_extra.height % 100_000 == 0 {
+                    info!("processed {}", block_extra.height);
+                }
+            }
             None => break,
         }
     }

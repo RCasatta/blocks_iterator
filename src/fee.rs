@@ -2,7 +2,7 @@ use crate::BlockExtra;
 use bitcoin::hashes::Hash;
 use bitcoin::{OutPoint, Script, Transaction, TxOut, Txid};
 use log::{debug, info};
-use std::collections::HashMap;
+use fxhash::FxHashMap;
 use std::convert::TryInto;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
@@ -14,7 +14,7 @@ pub struct Fee {
     utxo: Utxo,
 }
 
-struct Utxo(HashMap<TruncatedHash, Vec<Option<TxOut>>>);
+struct Utxo(FxHashMap<TruncatedHash, Vec<Option<TxOut>>>);
 
 #[derive(Eq, PartialEq, Hash)]
 struct TruncatedHash([u8; 12]);
@@ -27,8 +27,9 @@ impl From<Txid> for TruncatedHash {
 
 impl Utxo {
     pub fn new() -> Self {
-        Utxo(HashMap::new())
+        Utxo(FxHashMap::default())
     }
+
     pub fn add(&mut self, tx: &Transaction) -> Txid {
         let txid = tx.txid();
         self.0.insert(
@@ -37,6 +38,7 @@ impl Utxo {
         );
         txid
     }
+
     pub fn get(&mut self, outpoint: OutPoint) -> TxOut {
         let truncated: TruncatedHash = outpoint.txid.into();
         let mut outputs = self.0.remove(&truncated).unwrap();

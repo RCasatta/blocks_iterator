@@ -1,9 +1,9 @@
 use crate::BlockExtra;
 use bitcoin::blockdata::constants::genesis_block;
 use bitcoin::{BlockHash, Network};
+use fxhash::FxHashMap;
 use log::{debug, info};
 use std::collections::hash_map::Iter;
-use std::collections::HashMap;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 
@@ -15,11 +15,11 @@ pub struct Reorder {
     blocks: OutOfOrderBlocks,
 }
 
-struct OutOfOrderBlocks(HashMap<BlockHash, BlockExtra>);
+struct OutOfOrderBlocks(FxHashMap<BlockHash, BlockExtra>);
 
 impl OutOfOrderBlocks {
     fn new() -> Self {
-        OutOfOrderBlocks(HashMap::new())
+        OutOfOrderBlocks(FxHashMap::default())
     }
 
     fn add(&mut self, mut block_extra: BlockExtra) {
@@ -117,8 +117,8 @@ impl Reorder {
         }
         for (key, value) in self.blocks.iter() {
             info!(
-                "not connected: hash {} prev {} next {:?}",
-                key, value.block.header.prev_blockhash, value.next
+                "not connected: # {:7} hash {} prev {} next {:?}",
+                value.height, key, value.block.header.prev_blockhash, value.next
             );
         }
         self.sender.send(None).expect("reorder cannot send none");
