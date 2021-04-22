@@ -1,6 +1,5 @@
 use crate::BlockExtra;
 use bitcoin::blockdata::constants::genesis_block;
-use bitcoin::hashes::hex::FromHex;
 use bitcoin::{BlockHash, Network};
 use log::{info, log, warn, Level};
 use std::collections::HashMap;
@@ -51,18 +50,19 @@ impl OutOfOrderBlocks {
         self.blocks.insert(block_extra.block_hash, block_extra);
     }
 
-    /// check the block identified by `hash` has at least `n` blocks after, to be sure it's not a reorged block
-    /// keep track of the followed path with `first_next` that should be initialized with `None` in the first call
+    /// check the block identified by `hash` has at least `self.max_reorgs` blocks after, to be sure it's not a reorged block
+    /// keep track of the followed `path` that should be initialized with empty vec in the first call
     fn exist_and_has_followers(&self, hash: &BlockHash, path: Vec<BlockHash>) -> Option<BlockHash> {
+        if path.len() == self.max_reorg as usize {
+            return Some(path[0]);
+        }
         if let Some(block) = self.blocks.get(hash) {
             for next in block.next.iter() {
-                return if path.len() == self.max_reorg as usize {
-                    Some(path[0])
-                } else {
-                    let mut path = path.clone();
-                    path.push(*next);
-                    self.exist_and_has_followers(next, path)
-                };
+                let mut path = path.clone();
+                path.push(*next);
+                if let Some(hash) = self.exist_and_has_followers(next, path) {
+                    return Some(hash);
+                }
             }
         }
         None
@@ -105,6 +105,9 @@ impl Reorder {
         self.next = block_extra.next[0];
         block_extra.height = self.height;
         self.blocks.follows.remove(&block_extra.block_hash);
+        self.blocks
+            .blocks
+            .remove(&block_extra.block.header.prev_blockhash);
         self.sender.send(Some(block_extra)).unwrap();
         self.height += 1;
     }
@@ -135,11 +138,11 @@ impl Reorder {
 
                     count += 1;
 
-                    if self.blocks.blocks.len() > 2_000
-                    {
+                    if self.blocks.blocks.len() > 10_000 {
                         for block in self.blocks.blocks.values() {
                             println!("{} {:?}", block.block_hash, block.next);
                         }
+                        println!("next: {}", self.next);
                         panic!();
                     }
                     self.blocks.add(block_extra);

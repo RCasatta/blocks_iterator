@@ -29,7 +29,8 @@ pub struct Config {
     pub skip_prevout: bool,
 
     /// Maximum length of a reorg allowed, during reordering send block to the next step only
-    /// if it has `max_reorg` following blocks. Higher is more conservative, while lower faster
+    /// if it has `max_reorg` following blocks. Higher is more conservative, while lower faster.
+    /// When parsing testnet blocks, it may be necessary to increase this a lot
     #[structopt(short, long, default_value = "3")]
     pub max_reorg: u8,
 }
