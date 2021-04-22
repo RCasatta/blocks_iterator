@@ -1,7 +1,7 @@
 use crate::{periodic_log_level, BlockExtra};
 use bitcoin::blockdata::constants::genesis_block;
 use bitcoin::{BlockHash, Network};
-use log::{info, log, warn, Level};
+use log::{info, log, warn};
 use std::collections::HashMap;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
