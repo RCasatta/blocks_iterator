@@ -12,4 +12,3 @@ structopt = "0.3.21"
 log = "0.4.11"
 env_logger = "0.7"
 glob = "0.3.0"
-fxhash = "0.2.1" # hashmap slighlty faster than std with non crypto-secure hashing algo

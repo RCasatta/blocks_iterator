@@ -1,10 +1,8 @@
+use crate::truncmap::TruncMap;
 use crate::BlockExtra;
 use bitcoin::hashes::hex::FromHex;
-use bitcoin::hashes::Hash;
 use bitcoin::{OutPoint, Script, Transaction, TxOut, Txid};
-use fxhash::FxHashMap;
-use log::{debug, info};
-use std::convert::TryInto;
+use log::{debug, info, trace};
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::time::Instant;
@@ -16,20 +14,11 @@ pub struct Fee {
     utxo: Utxo,
 }
 
-struct Utxo(FxHashMap<TruncatedHash, Vec<Option<TxOut>>>);
-
-#[derive(Eq, PartialEq, Hash)]
-struct TruncatedHash([u8; 12]);
-
-impl From<Txid> for TruncatedHash {
-    fn from(txid: Txid) -> Self {
-        TruncatedHash(txid.into_inner()[0..12].try_into().unwrap())
-    }
-}
+struct Utxo(TruncMap);
 
 impl Utxo {
     pub fn new() -> Self {
-        Utxo(FxHashMap::default())
+        Utxo(TruncMap::default())
     }
 
     pub fn add(&mut self, tx: &Transaction) -> Txid {
@@ -40,17 +29,9 @@ impl Utxo {
         );
         if prev.is_some() {
             // pre bip-34 issue, coinbase without height may create the same hash
-            if txid
-                != Txid::from_hex(
-                    "d5d27987d2a3dfc724e359870c6644b40e497bdc0589a033220fe15429d88599",
-                )
-                .unwrap()
-                && txid
-                    != Txid::from_hex(
-                        "e3bf3d07d4b0375638d5f1db5255fe07ba2c4cb067cd81b84ee974b6585fb468",
-                    )
-                    .unwrap()
-            {
+            let a = "d5d27987d2a3dfc724e359870c6644b40e497bdc0589a033220fe15429d88599";
+            let b = "e3bf3d07d4b0375638d5f1db5255fe07ba2c4cb067cd81b84ee974b6585fb468";
+            if txid != Txid::from_hex(a).unwrap() && txid != Txid::from_hex(b).unwrap() {
                 panic!("truncated hash caused a collision {}", txid);
             }
         }
@@ -59,11 +40,10 @@ impl Utxo {
     }
 
     pub fn get(&mut self, outpoint: OutPoint) -> TxOut {
-        let truncated: TruncatedHash = outpoint.txid.into();
-        let mut outputs = self.0.remove(&truncated).unwrap();
+        let mut outputs = self.0.remove(&outpoint.txid).unwrap();
         let value = outputs[outpoint.vout as usize].take().unwrap();
         if outputs.iter().any(|e| e.is_some()) {
-            self.0.insert(truncated, outputs);
+            self.0.insert(outpoint.txid, outputs);
         }
         value
     }
@@ -92,11 +72,11 @@ impl Fee {
             let now = Instant::now();
             match received {
                 Some(mut block_extra) => {
-                    debug!("fee received: {}", block_extra.block_hash);
+                    trace!("fee received: {}", block_extra.block_hash);
                     total_txs += block_extra.block.txdata.len() as u64;
                     if !self.skip_prevout {
                         if block_extra.height % 10_000 == 0 {
-                            info!("tx in utxo: {}", self.utxo.0.len())
+                            info!("tx in utxo: {:?}", self.utxo.0.len())
                         }
                         for tx in block_extra.block.txdata.iter() {
                             let txid = self.utxo.add(tx);
@@ -128,7 +108,7 @@ impl Fee {
                             "#{:>6} {} size:{:>7} txs:{:>4} total_txs:{:>9} fee:{:>9}",
                             block_extra.height,
                             block_extra.block_hash,
-                            block_extra.block_bytes.len(),
+                            block_extra.size,
                             block_extra.block.txdata.len(),
                             total_txs,
                             block_extra.fee(),

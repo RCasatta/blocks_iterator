@@ -12,6 +12,7 @@ mod fee;
 mod parse;
 mod read;
 mod reorder;
+mod truncmap;
 
 #[derive(StructOpt, Debug, Clone)]
 pub struct Config {
@@ -37,7 +38,7 @@ pub struct Config {
 pub struct BlockExtra {
     pub block: Block,
     pub block_hash: BlockHash,
-    pub block_bytes: Box<[u8]>,
+    pub size: u32,
     pub next: Vec<BlockHash>, // vec cause in case of reorg could be more than one
     pub height: u32,
     pub outpoint_values: HashMap<OutPoint, TxOut>,
@@ -81,7 +82,7 @@ pub fn iterate(config: Config, channels: SyncSender<Option<BlockExtra>>) -> Join
             read.start();
         });
 
-        let (send_blocks, receive_blocks) = sync_channel(1_000);
+        let (send_blocks, receive_blocks) = sync_channel(100);
         let mut parse = parse::Parse::new(config.network, receive_blobs, send_blocks);
         let parse_handle = thread::spawn(move || {
             parse.start();
