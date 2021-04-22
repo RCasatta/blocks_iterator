@@ -1,4 +1,4 @@
-use crate::BlockExtra;
+use crate::{periodic_log_level, BlockExtra};
 use bitcoin::blockdata::constants::genesis_block;
 use bitcoin::{BlockHash, Network};
 use log::{info, log, warn, Level};
@@ -120,14 +120,8 @@ impl Reorder {
             let now = Instant::now();
             match received {
                 Some(block_extra) => {
-                    let level = if count % 10_000 == 0 {
-                        Level::Info
-                    } else {
-                        Level::Debug
-                    };
-
                     log!(
-                        level,
+                        periodic_log_level(count),
                         "reorder receive:{} size:{} follows:{} height:{} next:{}",
                         block_extra.block_hash,
                         self.blocks.blocks.len(),

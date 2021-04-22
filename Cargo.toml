@@ -3,8 +3,12 @@ name = "blocks_iterator"
 version = "0.1.0"
 authors = ["Riccardo Casatta <riccardo@casatta.it>"]
 edition = "2018"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+description = "Iterates Bitcoin blocks"
+repository = "https://github.com/RCasatta/blocks_iterator"
+documentation = "https://docs.rs/blocks_iterator/"
+keywords = ["bitcoin", "blocks", "iterate"]
+readme = "Readme.md"
+license = "MIT"
 
 [dependencies]
 bitcoin = "0.26.0"

@@ -1,5 +1,5 @@
 use bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut, Txid};
-use log::info;
+use log::{info, Level};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::mpsc::{sync_channel, SyncSender};
@@ -112,4 +112,12 @@ pub fn iterate(config: Config, channels: SyncSender<Option<BlockExtra>>) -> Join
         info!("Total time elapsed: {}s", now.elapsed().as_secs());
     });
     handle
+}
+
+fn periodic_log_level(i: u32) -> Level {
+    if i % 10_000 == 0 {
+        Level::Info
+    } else {
+        Level::Debug
+    }
 }
