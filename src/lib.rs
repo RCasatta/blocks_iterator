@@ -16,6 +16,7 @@ mod truncmap;
 
 #[derive(StructOpt, Debug, Clone)]
 pub struct Config {
+    /// Blocks directory (containing `blocks*.dat`)
     #[structopt(short, long)]
     pub blocks_dir: PathBuf,
 
@@ -76,20 +77,20 @@ pub fn iterate(config: Config, channels: SyncSender<Option<BlockExtra>>) -> Join
     let handle = thread::spawn(move || {
         let now = Instant::now();
 
-        let (send_blobs, receive_blobs) = sync_channel(1);
+        let (send_blobs, receive_blobs) = sync_channel(2);
 
         let mut read = read::Read::new(config.blocks_dir.clone(), send_blobs);
         let read_handle = thread::spawn(move || {
             read.start();
         });
 
-        let (send_blocks, receive_blocks) = sync_channel(100);
+        let (send_blocks, receive_blocks) = sync_channel(200);
         let mut parse = parse::Parse::new(config.network, receive_blobs, send_blocks);
         let parse_handle = thread::spawn(move || {
             parse.start();
         });
 
-        let (send_ordered_blocks, receive_ordered_blocks) = sync_channel(100);
+        let (send_ordered_blocks, receive_ordered_blocks) = sync_channel(200);
         let mut reorder = reorder::Reorder::new(
             config.network,
             config.max_reorg,
