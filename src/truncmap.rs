@@ -1,12 +1,14 @@
 use bitcoin::{OutPoint, TxOut};
 use std::collections::HashMap;
-use std::convert::TryInto;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 #[derive(Eq, PartialEq, Hash)]
-struct TruncatedKey([u8; 6]);
+struct TruncatedKey(u64);
 
 /// A map like struct storing truncated keys to save memory, in case of collisions a fallback map
 /// with the full key is used
+/// It obviously loose the ability to iterate over keys
 pub struct TruncMap {
     trunc: HashMap<TruncatedKey, TxOut>,
     full: HashMap<OutPoint, TxOut>,
@@ -14,11 +16,9 @@ pub struct TruncMap {
 
 impl From<&OutPoint> for TruncatedKey {
     fn from(outpoint: &OutPoint) -> Self {
-        let mut trunc: [u8; 6] = (&outpoint.txid)[0..6].try_into().unwrap();
-        let vout: [u8; 4] = outpoint.vout.to_le_bytes();
-        trunc[0] = vout[0];
-        trunc[1] = vout[1];
-        TruncatedKey(trunc)
+        let mut hasher = DefaultHasher::new();
+        outpoint.hash(&mut hasher);
+        TruncatedKey(hasher.finish())
     }
 }
 
