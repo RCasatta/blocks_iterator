@@ -36,3 +36,20 @@ jobs:
         with:
           command: build
           args:  --verbose --all
+
+  examples:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        example: [ heaviest, iterate, most_output ]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --example ${{ matrix.example }}

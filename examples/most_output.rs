@@ -13,17 +13,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::from_args();
     let (send, recv) = sync_channel(100);
     let handle = blocks_iterator::iterate(config, send);
-    let mut heaviest: (Txid, usize) = (Txid::default(), 0);
+    let mut most_output: (Txid, usize) = (Txid::default(), 0);
     while let Some(block_extra) = recv.recv()? {
         for tx in block_extra.block.txdata.iter() {
-            if tx.get_weight() > heaviest.1 {
+            if tx.output.len() > most_output.1 {
                 let txid = tx.txid();
-                info!("New heaviest tx: {}", txid);
-                heaviest = (txid, tx.get_weight());
+                info!("New most_output tx: {}", txid);
+                most_output = (txid, tx.output.len());
             }
         }
     }
     handle.join().expect("couldn't join");
-    info!("heaviest tx is {} with weight: {}", heaviest.0, heaviest.1);
+    info!(
+        "most_output tx is {} with #outputs: {}",
+        most_output.0, most_output.1
+    );
     Ok(())
 }
