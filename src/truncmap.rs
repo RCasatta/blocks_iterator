@@ -82,7 +82,7 @@ impl Hasher for PassthroughHasher {
     }
 
     fn write(&mut self, _bytes: &[u8]) {
-        todo!("passtrough hasher should not pass here!")
+        panic!("passtrough hasher should not pass here!")
     }
 
     fn write_u64(&mut self, i: u64) {
