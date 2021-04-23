@@ -1,22 +1,24 @@
-use bitcoin::{TxOut, Txid};
+use bitcoin::{OutPoint, TxOut};
 use std::collections::HashMap;
 use std::convert::TryInto;
 
-type VecTxOut = Vec<Option<TxOut>>;
-
 #[derive(Eq, PartialEq, Hash)]
-struct TruncatedHash([u8; 5]);
+struct TruncatedKey([u8; 6]);
 
 /// A map like struct storing truncated keys to save memory, in case of collisions a fallback map
 /// with the full key is used
 pub struct TruncMap {
-    trunc: HashMap<TruncatedHash, VecTxOut>,
-    full: HashMap<Txid, VecTxOut>,
+    trunc: HashMap<TruncatedKey, TxOut>,
+    full: HashMap<OutPoint, TxOut>,
 }
 
-impl From<&Txid> for TruncatedHash {
-    fn from(txid: &Txid) -> Self {
-        TruncatedHash((&txid[0..5]).try_into().unwrap())
+impl From<&OutPoint> for TruncatedKey {
+    fn from(outpoint: &OutPoint) -> Self {
+        let mut trunc: [u8; 6] = (&outpoint.txid)[0..6].try_into().unwrap();
+        let vout: [u8; 4] = outpoint.vout.to_le_bytes();
+        trunc[0] = vout[0];
+        trunc[1] = vout[1];
+        TruncatedKey(trunc)
     }
 }
 
@@ -30,20 +32,20 @@ impl Default for TruncMap {
 }
 
 impl TruncMap {
-    pub fn insert(&mut self, txid: Txid, value: VecTxOut) -> Option<VecTxOut> {
-        let truncated_txid = (&txid).into();
-        if self.trunc.get(&truncated_txid).is_some() {
-            self.full.insert(txid, value)
+    pub fn insert(&mut self, outpoint: OutPoint, value: TxOut) -> Option<TxOut> {
+        let truncated_outpoint = (&outpoint).into();
+        if self.trunc.get(&truncated_outpoint).is_some() {
+            self.full.insert(outpoint, value)
         } else {
-            self.trunc.insert(truncated_txid, value)
+            self.trunc.insert(truncated_outpoint, value)
         }
     }
 
-    pub fn remove(&mut self, txid: &Txid) -> Option<VecTxOut> {
-        if let Some(val) = self.full.remove(txid) {
+    pub fn remove(&mut self, outpoint: &OutPoint) -> Option<TxOut> {
+        if let Some(val) = self.full.remove(outpoint) {
             Some(val)
         } else {
-            self.trunc.remove(&txid.into())
+            self.trunc.remove(&outpoint.into())
         }
     }
 

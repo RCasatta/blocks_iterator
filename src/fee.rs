@@ -1,6 +1,5 @@
 use crate::truncmap::TruncMap;
 use crate::BlockExtra;
-use bitcoin::hashes::hex::FromHex;
 use bitcoin::{OutPoint, Script, Transaction, TxOut, Txid};
 use log::{debug, info, trace};
 use std::sync::mpsc::Receiver;
@@ -23,29 +22,14 @@ impl Utxo {
 
     pub fn add(&mut self, tx: &Transaction) -> Txid {
         let txid = tx.txid();
-        let prev = self.0.insert(
-            txid,
-            tx.output.iter().map(|txout| Some(txout.clone())).collect(),
-        );
-        if prev.is_some() {
-            // pre bip-34 issue, coinbase without height may create the same hash
-            let a = "d5d27987d2a3dfc724e359870c6644b40e497bdc0589a033220fe15429d88599";
-            let b = "e3bf3d07d4b0375638d5f1db5255fe07ba2c4cb067cd81b84ee974b6585fb468";
-            if txid != Txid::from_hex(a).unwrap() && txid != Txid::from_hex(b).unwrap() {
-                panic!("truncated hash caused a collision {}", txid);
-            }
+        for (i, output) in tx.output.iter().enumerate() {
+            self.0.insert(OutPoint::new(txid, i as u32), output.clone());
         }
-
         txid
     }
 
-    pub fn get(&mut self, outpoint: OutPoint) -> TxOut {
-        let mut outputs = self.0.remove(&outpoint.txid).unwrap();
-        let value = outputs[outpoint.vout as usize].take().unwrap();
-        if outputs.iter().any(|e| e.is_some()) {
-            self.0.insert(outpoint.txid, outputs);
-        }
-        value
+    pub fn remove(&mut self, outpoint: OutPoint) -> TxOut {
+        self.0.remove(&outpoint).unwrap()
     }
 }
 
@@ -85,7 +69,7 @@ impl Fee {
 
                         for tx in block_extra.block.txdata.iter().skip(1) {
                             for input in tx.input.iter() {
-                                let previous_txout = self.utxo.get(input.previous_output);
+                                let previous_txout = self.utxo.remove(input.previous_output);
                                 block_extra
                                     .outpoint_values
                                     .insert(input.previous_output, previous_txout);
