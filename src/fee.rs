@@ -24,7 +24,7 @@ impl Utxo {
     pub fn add(&mut self, tx: &Transaction) -> Txid {
         let txid = tx.txid();
         let prev = self.0.insert(
-            txid.into(),
+            txid,
             tx.output.iter().map(|txout| Some(txout.clone())).collect(),
         );
         if prev.is_some() {
@@ -114,7 +114,7 @@ impl Fee {
                             block_extra.fee(),
                         );
                     }
-                    busy_time = busy_time + now.elapsed().as_nanos();
+                    busy_time += now.elapsed().as_nanos();
                     self.sender.send(Some(block_extra)).unwrap();
                 }
                 None => break,

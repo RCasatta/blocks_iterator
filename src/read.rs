@@ -30,7 +30,7 @@ impl Read {
             let blob = fs::read(path).unwrap_or_else(|_| panic!("failed to read {:?}", path));
             let len = blob.len();
             info!("read {} of {:?}", len, path);
-            busy_time = busy_time + now.elapsed().as_nanos();
+            busy_time += now.elapsed().as_nanos();
             self.sender.send(Some(blob)).expect("cannot send");
         }
         self.sender.send(None).expect("cannot send");

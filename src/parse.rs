@@ -45,7 +45,7 @@ impl Parse {
                         blocks_vec.len(),
                         total_blocks
                     );
-                    busy_time = busy_time + now.elapsed().as_nanos();
+                    busy_time += now.elapsed().as_nanos();
                     for block in blocks_vec {
                         if !self.seen.contains(&block.block_hash) {
                             self.seen.insert(block.block_hash);

@@ -74,7 +74,7 @@ impl BlockExtra {
 }
 
 pub fn iterate(config: Config, channels: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {
-    let handle = thread::spawn(move || {
+    thread::spawn(move || {
         let now = Instant::now();
 
         let (send_blobs, receive_blobs) = sync_channel(2);
@@ -111,8 +111,7 @@ pub fn iterate(config: Config, channels: SyncSender<Option<BlockExtra>>) -> Join
         orderer_handle.join().unwrap();
         fee_handle.join().unwrap();
         info!("Total time elapsed: {}s", now.elapsed().as_secs());
-    });
-    handle
+    })
 }
 
 fn periodic_log_level(i: u32) -> Level {

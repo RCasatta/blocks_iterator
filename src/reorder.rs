@@ -35,7 +35,7 @@ impl OutOfOrderBlocks {
         self.follows
             .entry(prev_hash)
             .and_modify(|e| e.push(block_extra.block_hash))
-            .or_insert(vec![block_extra.block_hash]);
+            .or_insert_with(|| vec![block_extra.block_hash]);
 
         if let Some(follows) = self.follows.remove(&block_extra.block_hash) {
             for el in follows {
