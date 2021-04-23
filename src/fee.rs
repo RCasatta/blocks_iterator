@@ -23,7 +23,7 @@ impl Utxo {
     pub fn add(&mut self, tx: &Transaction) -> Txid {
         let txid = tx.txid();
         for (i, output) in tx.output.iter().enumerate() {
-            self.0.insert(OutPoint::new(txid, i as u32), output.clone());
+            self.0.insert(OutPoint::new(txid, i as u32), output);
         }
         txid
     }
