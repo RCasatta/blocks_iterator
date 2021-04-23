@@ -114,7 +114,7 @@ pub fn iterate(config: Config, channels: SyncSender<Option<BlockExtra>>) -> Join
     })
 }
 
-fn periodic_log_level(i: u32) -> Level {
+pub fn periodic_log_level(i: u32) -> Level {
     if i % 10_000 == 0 {
         Level::Info
     } else {
