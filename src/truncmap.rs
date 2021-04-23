@@ -1,5 +1,4 @@
 use bitcoin::{OutPoint, TxOut};
-use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash, Hasher};
 
@@ -17,7 +16,7 @@ pub struct TruncMap {
 
 impl From<&OutPoint> for TruncatedKey {
     fn from(outpoint: &OutPoint) -> Self {
-        let mut hasher = DefaultHasher::new();
+        let mut hasher = fxhash::FxHasher64::default();
         outpoint.hash(&mut hasher);
         TruncatedKey(hasher.finish())
     }
