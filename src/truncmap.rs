@@ -3,37 +3,30 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash, Hasher};
 
-#[derive(Eq, PartialEq, Hash)]
-struct TruncatedKey(u64);
-
 /// A map like struct storing truncated keys to save memory, in case of collisions a fallback map
 /// with the full key is used.
 /// It obviously loose the ability to iterate over keys
 /// TODO actually truncated u64 keys are stored, in theory it's possible to avoid storage completely
 pub struct TruncMap {
     /// use a PassthroughHasher since `From<&Outpoint>` it's already hashing the key
-    trunc: HashMap<TruncatedKey, TxOut, PassthroughHasher>,
+    trunc: HashMap<u64, TxOut, PassthroughHasher>,
     full: HashMap<OutPoint, TxOut>,
-}
-
-impl From<&OutPoint> for TruncatedKey {
-    fn from(outpoint: &OutPoint) -> Self {
-        let mut hasher = fxhash::FxHasher64::default();
-        outpoint.hash(&mut hasher);
-        TruncatedKey(hasher.finish())
-    }
+    build_hasher: fxhash::FxBuildHasher,
 }
 
 impl TruncMap {
+    /// insert a value in the map
+    /// value is Cow<>, because in the more common case if I would accept TxOut but the caller has &TxOut 2 clones in total would be necessary (1 from the caller and 1 inside) while with the Cow only 1 is needed
+    /// when accepting &TxOut but the caller has TxOut, we internally need 1 clone in both cases
     pub fn insert(&mut self, outpoint: OutPoint, value: Cow<TxOut>) {
         // we optimistically insert since collision must be rare
         let old = self
             .trunc
-            .insert((&outpoint).into(), value.clone().into_owned());
+            .insert(self.hash(&outpoint), value.clone().into_owned());
 
         if let Some(old) = old {
             // rolling back since the element did exist
-            self.trunc.insert((&outpoint).into(), old);
+            self.trunc.insert(self.hash(&outpoint), old);
             // since key collided, saving in the full map
             self.full.insert(outpoint, value.into_owned());
         }
@@ -43,22 +36,29 @@ impl TruncMap {
         if let Some(val) = self.full.remove(outpoint) {
             Some(val)
         } else {
-            self.trunc.remove(&outpoint.into())
+            self.trunc.remove(&self.hash(outpoint))
         }
     }
 
     pub fn len(&self) -> (usize, usize) {
         (self.trunc.len(), self.full.len())
     }
+
+    fn hash(&self, outpoint: &OutPoint) -> u64 {
+        let mut hasher = self.build_hasher.build_hasher();
+        outpoint.hash(&mut hasher);
+        hasher.finish()
+    }
 }
 
 impl Default for TruncMap {
     fn default() -> Self {
         TruncMap {
-            trunc: HashMap::<TruncatedKey, TxOut, PassthroughHasher>::with_hasher(
+            trunc: HashMap::<u64, TxOut, PassthroughHasher>::with_hasher(
                 PassthroughHasher::default(),
             ),
             full: HashMap::new(),
+            build_hasher: Default::default(),
         }
     }
 }
