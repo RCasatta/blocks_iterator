@@ -1,4 +1,5 @@
 use bitcoin::{OutPoint, TxOut};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash, Hasher};
 
@@ -8,6 +9,7 @@ struct TruncatedKey(u64);
 /// A map like struct storing truncated keys to save memory, in case of collisions a fallback map
 /// with the full key is used.
 /// It obviously loose the ability to iterate over keys
+/// TODO actually truncated u64 keys are stored, in theory it's possible to avoid storage completely
 pub struct TruncMap {
     /// use a PassthroughHasher since `From<&Outpoint>` it's already hashing the key
     trunc: HashMap<TruncatedKey, TxOut, PassthroughHasher>,
@@ -23,15 +25,17 @@ impl From<&OutPoint> for TruncatedKey {
 }
 
 impl TruncMap {
-    pub fn insert(&mut self, outpoint: OutPoint, value: &TxOut) {
+    pub fn insert(&mut self, outpoint: OutPoint, value: Cow<TxOut>) {
         // we optimistically insert since collision must be rare
-        let old = self.trunc.insert((&outpoint).into(), value.clone());
+        let old = self
+            .trunc
+            .insert((&outpoint).into(), value.clone().into_owned());
 
         if let Some(old) = old {
             // rolling back since the element did exist
             self.trunc.insert((&outpoint).into(), old);
             // since key collided, saving in the full map
-            self.full.insert(outpoint, value.clone());
+            self.full.insert(outpoint, value.into_owned());
         }
     }
 

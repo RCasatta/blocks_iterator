@@ -29,6 +29,11 @@ pub struct Config {
     #[structopt(short, long)]
     pub skip_prevout: bool,
 
+    /// Doesn't store the script_pubkey so it's not available in previous_output to save memory.
+    /// When `skip_prevout` is true it's implied
+    #[structopt(short, long)]
+    pub skip_script_pubkey: bool,
+
     /// Maximum length of a reorg allowed, during reordering send block to the next step only
     /// if it has `max_reorg` following blocks. Higher is more conservative, while lower faster.
     /// When parsing testnet blocks, it may be necessary to increase this a lot
@@ -101,7 +106,12 @@ pub fn iterate(config: Config, channels: SyncSender<Option<BlockExtra>>) -> Join
             reorder.start();
         });
 
-        let mut fee = fee::Fee::new(config.skip_prevout, receive_ordered_blocks, channels);
+        let mut fee = fee::Fee::new(
+            config.skip_prevout,
+            config.skip_script_pubkey,
+            receive_ordered_blocks,
+            channels,
+        );
         let fee_handle = thread::spawn(move || {
             fee.start();
         });
