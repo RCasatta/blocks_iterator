@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash, Hasher};
 
 /// A map like struct storing truncated keys to save memory, in case of collisions a fallback map
-/// with the full key is used.
+/// with the full key is used. This is only possible because we know OutPoint are unique.
 /// It obviously loose the ability to iterate over keys
 pub struct TruncMap {
     /// use a PassthroughHasher since the key it's already an hash

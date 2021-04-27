@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     while let Some(block_extra) = recv.recv()? {
         log!(
             periodic_log_level(block_extra.height),
-            "# {:7} {} {:10}",
+            "# {:7} {} {:?}",
             block_extra.height,
             block_extra.block_hash,
             block_extra.fee()
