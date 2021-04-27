@@ -1,4 +1,5 @@
 use bitcoin::{OutPoint, TxOut};
+use fxhash::FxHashMap;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash, Hasher};
@@ -6,11 +7,10 @@ use std::hash::{BuildHasher, Hash, Hasher};
 /// A map like struct storing truncated keys to save memory, in case of collisions a fallback map
 /// with the full key is used.
 /// It obviously loose the ability to iterate over keys
-/// TODO actually truncated u64 keys are stored, in theory it's possible to avoid storage completely
 pub struct TruncMap {
-    /// use a PassthroughHasher since `From<&Outpoint>` it's already hashing the key
+    /// use a PassthroughHasher since the key it's already an hash
     trunc: HashMap<u64, TxOut, PassthroughHasher>,
-    full: HashMap<OutPoint, TxOut>,
+    full: FxHashMap<OutPoint, TxOut>,
     build_hasher: fxhash::FxBuildHasher,
 }
 
@@ -57,7 +57,7 @@ impl Default for TruncMap {
             trunc: HashMap::<u64, TxOut, PassthroughHasher>::with_hasher(
                 PassthroughHasher::default(),
             ),
-            full: HashMap::new(),
+            full: FxHashMap::default(),
             build_hasher: Default::default(),
         }
     }
