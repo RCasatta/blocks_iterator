@@ -1,6 +1,5 @@
-use bitcoin::{OutPoint, TxOut};
+use bitcoin::{OutPoint, Script, TxOut};
 use fxhash::FxHashMap;
-use std::borrow::Cow;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash, Hasher};
 
@@ -9,26 +8,36 @@ use std::hash::{BuildHasher, Hash, Hasher};
 /// It obviously loose the ability to iterate over keys
 pub struct TruncMap {
     /// use a PassthroughHasher since the key it's already an hash
-    trunc: HashMap<u64, TxOut, PassthroughHasher>,
+    trunc: HashMap<u64, ScriptValue, PassthroughHasher>,
     full: FxHashMap<OutPoint, TxOut>,
+    scripts: FxHashMap<u64, (Script, u64)>,
     build_hasher: fxhash::FxBuildHasher,
 }
 
 impl TruncMap {
-    /// insert a value in the map
-    /// value is Cow<>, because in the more common case if I would accept TxOut but the caller has &TxOut 2 clones in total would be necessary (1 from the caller and 1 inside) while with the Cow only 1 is needed
-    /// when accepting &TxOut but the caller has TxOut, we internally need 1 clone in both cases
-    pub fn insert(&mut self, outpoint: OutPoint, value: Cow<TxOut>) {
+    pub fn insert(&mut self, outpoint: OutPoint, tx_out: &TxOut) {
+        let script_hash = if tx_out.script_pubkey != Script::default() {
+            let script_hash = self.hash_script(&tx_out.script_pubkey);
+            self.scripts
+                .entry(script_hash)
+                .and_modify(|c| c.1 += 1)
+                .or_insert((tx_out.script_pubkey.clone(), 1));
+            script_hash
+        } else {
+            0
+        };
+        let script_value = ScriptValue {
+            script_ref: script_hash,
+            value: tx_out.value,
+        };
         // we optimistically insert since collision must be rare
-        let old = self
-            .trunc
-            .insert(self.hash(&outpoint), value.clone().into_owned());
+        let old = self.trunc.insert(self.hash(&outpoint), script_value);
 
         if let Some(old) = old {
             // rolling back since the element did exist
             self.trunc.insert(self.hash(&outpoint), old);
             // since key collided, saving in the full map
-            self.full.insert(outpoint, value.into_owned());
+            self.full.insert(outpoint, tx_out.clone());
         }
     }
 
@@ -36,7 +45,16 @@ impl TruncMap {
         if let Some(val) = self.full.remove(outpoint) {
             Some(val)
         } else {
-            self.trunc.remove(&self.hash(outpoint))
+            let sv = self.trunc.remove(&self.hash(outpoint)).unwrap();
+            let (script, counter) = self.scripts.remove(&sv.script_ref).unwrap_or_default();
+            if counter > 1 {
+                self.scripts
+                    .insert(sv.script_ref, (script.clone(), counter - 1));
+            }
+            Some(TxOut {
+                script_pubkey: script,
+                value: sv.value,
+            })
         }
     }
 
@@ -49,14 +67,25 @@ impl TruncMap {
         outpoint.hash(&mut hasher);
         hasher.finish()
     }
+    fn hash_script(&self, script: &Script) -> u64 {
+        let mut hasher = self.build_hasher.build_hasher();
+        script.hash(&mut hasher);
+        hasher.finish()
+    }
+}
+
+struct ScriptValue {
+    script_ref: u64,
+    value: u64,
 }
 
 impl Default for TruncMap {
     fn default() -> Self {
         TruncMap {
-            trunc: HashMap::<u64, TxOut, PassthroughHasher>::with_hasher(
+            trunc: HashMap::<u64, ScriptValue, PassthroughHasher>::with_hasher(
                 PassthroughHasher::default(),
             ),
+            scripts: FxHashMap::default(),
             full: FxHashMap::default(),
             build_hasher: Default::default(),
         }

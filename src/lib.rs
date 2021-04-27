@@ -29,11 +29,6 @@ pub struct Config {
     #[structopt(short, long)]
     pub skip_prevout: bool,
 
-    /// Doesn't store the script_pubkey so it's not available in previous_output to save memory.
-    /// When `skip_prevout` is true it's implied
-    #[structopt(short, long)]
-    pub skip_script_pubkey: bool,
-
     /// Maximum length of a reorg allowed, during reordering send block to the next step only
     /// if it has `max_reorg` following blocks. Higher is more conservative, while lower faster.
     /// When parsing testnet blocks, it may be necessary to increase this a lot
@@ -53,32 +48,32 @@ pub struct BlockExtra {
 }
 
 impl BlockExtra {
-    pub fn average_fee(&self) -> f64 {
-        self.fee() as f64 / self.block.txdata.len() as f64
+    pub fn average_fee(&self) -> Option<f64> {
+        Some(self.fee()? as f64 / self.block.txdata.len() as f64)
     }
 
-    pub fn fee(&self) -> u64 {
+    pub fn fee(&self) -> Option<u64> {
         let mut total = 0u64;
         for tx in self.block.txdata.iter() {
-            total += self.tx_fee(tx);
+            total += self.tx_fee(tx)?;
         }
-        total
+        Some(total)
     }
 
-    pub fn tx_fee(&self, tx: &Transaction) -> u64 {
+    pub fn tx_fee(&self, tx: &Transaction) -> Option<u64> {
         let output_total: u64 = tx.output.iter().map(|el| el.value).sum();
         let mut input_total = 0u64;
         for input in tx.input.iter() {
             match self.outpoint_values.get(&input.previous_output) {
                 Some(txout) => input_total += txout.value,
-                None => panic!("can't find tx fee {}", tx.txid()),
+                None => return None,
             }
         }
-        input_total - output_total
+        Some(input_total - output_total)
     }
 }
 
-pub fn iterate(config: Config, channels: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {
+pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {
     thread::spawn(move || {
         let now = Instant::now();
 
@@ -96,30 +91,31 @@ pub fn iterate(config: Config, channels: SyncSender<Option<BlockExtra>>) -> Join
         });
 
         let (send_ordered_blocks, receive_ordered_blocks) = sync_channel(200);
+        let channels_if_skip = channel.clone();
         let mut reorder = reorder::Reorder::new(
             config.network,
+            config.skip_prevout,
             config.max_reorg,
             receive_blocks,
             send_ordered_blocks,
+            channels_if_skip,
         );
         let orderer_handle = thread::spawn(move || {
             reorder.start();
         });
 
-        let mut fee = fee::Fee::new(
-            config.skip_prevout,
-            config.skip_script_pubkey,
-            receive_ordered_blocks,
-            channels,
-        );
-        let fee_handle = thread::spawn(move || {
-            fee.start();
-        });
+        if !config.skip_prevout {
+            let mut fee = fee::Fee::new(receive_ordered_blocks, channel);
+            let fee_handle = thread::spawn(move || {
+                fee.start();
+            });
+            fee_handle.join().unwrap();
+        }
 
         read_handle.join().unwrap();
         parse_handle.join().unwrap();
         orderer_handle.join().unwrap();
-        fee_handle.join().unwrap();
+
         info!("Total time elapsed: {}s", now.elapsed().as_secs());
     })
 }

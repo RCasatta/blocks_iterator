@@ -2,14 +2,11 @@ use crate::truncmap::TruncMap;
 use crate::BlockExtra;
 use bitcoin::{OutPoint, Script, Transaction, TxOut, Txid};
 use log::{debug, info, trace};
-use std::borrow::Cow;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::time::Instant;
 
 pub struct Fee {
-    skip_prevout: bool,
-    skip_script_pubkey: bool,
     receiver: Receiver<Option<BlockExtra>>,
     sender: SyncSender<Option<BlockExtra>>,
     utxo: Utxo,
@@ -22,16 +19,9 @@ impl Utxo {
         Utxo(TruncMap::default())
     }
 
-    pub fn add(&mut self, tx: &Transaction, skip_script_pubkey: bool) -> Txid {
+    pub fn add(&mut self, tx: &Transaction) -> Txid {
         let txid = tx.txid();
         for (i, output) in tx.output.iter().enumerate() {
-            let output = if skip_script_pubkey {
-                let mut output = output.clone();
-                output.script_pubkey = Script::default();
-                Cow::Owned(output)
-            } else {
-                Cow::Borrowed(output)
-            };
             self.0.insert(OutPoint::new(txid, i as u32), output);
         }
         txid
@@ -44,14 +34,10 @@ impl Utxo {
 
 impl Fee {
     pub fn new(
-        skip_prevout: bool,
-        skip_script_pubkey: bool,
         receiver: Receiver<Option<BlockExtra>>,
         sender: SyncSender<Option<BlockExtra>>,
     ) -> Fee {
         Fee {
-            skip_prevout,
-            skip_script_pubkey,
             sender,
             receiver,
             utxo: Utxo::new(),
@@ -69,46 +55,46 @@ impl Fee {
                 Some(mut block_extra) => {
                     trace!("fee received: {}", block_extra.block_hash);
                     total_txs += block_extra.block.txdata.len() as u64;
-                    if !self.skip_prevout {
-                        if block_extra.height % 10_000 == 0 {
-                            info!("tx in utxo: {:?}", self.utxo.0.len())
-                        }
-                        for tx in block_extra.block.txdata.iter() {
-                            let txid = self.utxo.add(tx, self.skip_script_pubkey);
-                            block_extra.tx_hashes.insert(txid);
-                        }
 
-                        for tx in block_extra.block.txdata.iter().skip(1) {
-                            for input in tx.input.iter() {
-                                let previous_txout = self.utxo.remove(input.previous_output);
-                                block_extra
-                                    .outpoint_values
-                                    .insert(input.previous_output, previous_txout);
-                            }
-                        }
-                        let coin_base_output_value = block_extra.block.txdata[0]
-                            .output
-                            .iter()
-                            .map(|el| el.value)
-                            .sum();
-                        block_extra.outpoint_values.insert(
-                            OutPoint::default(),
-                            TxOut {
-                                script_pubkey: Script::new(),
-                                value: coin_base_output_value,
-                            },
-                        );
-
-                        debug!(
-                            "#{:>6} {} size:{:>7} txs:{:>4} total_txs:{:>9} fee:{:>9}",
-                            block_extra.height,
-                            block_extra.block_hash,
-                            block_extra.size,
-                            block_extra.block.txdata.len(),
-                            total_txs,
-                            block_extra.fee(),
-                        );
+                    if block_extra.height % 10_000 == 0 {
+                        info!("tx in utxo: {:?}", self.utxo.0.len())
                     }
+                    for tx in block_extra.block.txdata.iter() {
+                        let txid = self.utxo.add(tx);
+                        block_extra.tx_hashes.insert(txid);
+                    }
+
+                    for tx in block_extra.block.txdata.iter().skip(1) {
+                        for input in tx.input.iter() {
+                            let previous_txout = self.utxo.remove(input.previous_output);
+                            block_extra
+                                .outpoint_values
+                                .insert(input.previous_output, previous_txout);
+                        }
+                    }
+                    let coin_base_output_value = block_extra.block.txdata[0]
+                        .output
+                        .iter()
+                        .map(|el| el.value)
+                        .sum();
+                    block_extra.outpoint_values.insert(
+                        OutPoint::default(),
+                        TxOut {
+                            script_pubkey: Script::new(),
+                            value: coin_base_output_value,
+                        },
+                    );
+
+                    debug!(
+                        "#{:>6} {} size:{:>7} txs:{:>4} total_txs:{:>9} fee:{:?}",
+                        block_extra.height,
+                        block_extra.block_hash,
+                        block_extra.size,
+                        block_extra.block.txdata.len(),
+                        total_txs,
+                        block_extra.fee(),
+                    );
+
                     busy_time += now.elapsed().as_nanos();
                     self.sender.send(Some(block_extra)).unwrap();
                 }

@@ -88,10 +88,17 @@ impl OutOfOrderBlocks {
 impl Reorder {
     pub fn new(
         network: Network,
+        skip_prevouts: bool,
         max_reorg: u8,
         receiver: Receiver<Option<BlockExtra>>,
-        sender: SyncSender<Option<BlockExtra>>,
+        sender_fee: SyncSender<Option<BlockExtra>>,
+        sender_end: SyncSender<Option<BlockExtra>>,
     ) -> Reorder {
+        let sender = if skip_prevouts {
+            sender_end
+        } else {
+            sender_fee
+        };
         Reorder {
             sender,
             receiver,
