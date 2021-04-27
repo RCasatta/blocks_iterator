@@ -58,8 +58,8 @@ impl TruncMap {
         }
     }
 
-    pub fn len(&self) -> (usize, usize) {
-        (self.trunc.len(), self.full.len())
+    pub fn len(&self) -> (usize, usize, usize) {
+        (self.trunc.len(), self.full.len(), self.scripts.len())
     }
 
     fn hash(&self, outpoint: &OutPoint) -> u64 {

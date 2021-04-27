@@ -57,7 +57,7 @@ impl Fee {
                     total_txs += block_extra.block.txdata.len() as u64;
 
                     if block_extra.height % 10_000 == 0 {
-                        info!("tx in utxo: {:?}", self.utxo.0.len())
+                        info!("(outpoints, outpoints_collision, scripts): {:?}", self.utxo.0.len())
                     }
                     for tx in block_extra.block.txdata.iter() {
                         let txid = self.utxo.add(tx);
