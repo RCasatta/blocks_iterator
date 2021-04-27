@@ -1,16 +1,17 @@
-use bitcoin::{OutPoint, TxOut};
-use std::borrow::Cow;
+use crate::fee::VecStatus;
+use bitcoin::consensus::{deserialize, serialize};
+use bitcoin::Txid;
+use fxhash::FxHashMap;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hash, Hasher};
 
 /// A map like struct storing truncated keys to save memory, in case of collisions a fallback map
 /// with the full key is used.
 /// It obviously loose the ability to iterate over keys
-/// TODO actually truncated u64 keys are stored, in theory it's possible to avoid storage completely
 pub struct TruncMap {
-    /// use a PassthroughHasher since `From<&Outpoint>` it's already hashing the key
-    trunc: HashMap<u64, TxOut, PassthroughHasher>,
-    full: HashMap<OutPoint, TxOut>,
+    /// use a PassthroughHasher since u64 it's already an hash
+    trunc: HashMap<u64, Box<[u8]>, PassthroughHasher>,
+    full: FxHashMap<Txid, VecStatus>,
     build_hasher: fxhash::FxBuildHasher,
 }
 
@@ -18,25 +19,26 @@ impl TruncMap {
     /// insert a value in the map
     /// value is Cow<>, because in the more common case if I would accept TxOut but the caller has &TxOut 2 clones in total would be necessary (1 from the caller and 1 inside) while with the Cow only 1 is needed
     /// when accepting &TxOut but the caller has TxOut, we internally need 1 clone in both cases
-    pub fn insert(&mut self, outpoint: OutPoint, value: Cow<TxOut>) {
+    pub fn insert(&mut self, txid: Txid, value: VecStatus) {
         // we optimistically insert since collision must be rare
-        let old = self
-            .trunc
-            .insert(self.hash(&outpoint), value.clone().into_owned());
+        let key = self.hash(&txid);
+        let old = self.trunc.insert(key, serialize(&value).into_boxed_slice());
 
         if let Some(old) = old {
             // rolling back since the element did exist
-            self.trunc.insert(self.hash(&outpoint), old);
+            self.trunc.insert(key, old);
             // since key collided, saving in the full map
-            self.full.insert(outpoint, value.into_owned());
+            self.full.insert(txid, value);
         }
     }
 
-    pub fn remove(&mut self, outpoint: &OutPoint) -> Option<TxOut> {
-        if let Some(val) = self.full.remove(outpoint) {
+    pub fn remove(&mut self, txid: &Txid) -> Option<VecStatus> {
+        if let Some(val) = self.full.remove(txid) {
             Some(val)
         } else {
-            self.trunc.remove(&self.hash(outpoint))
+            self.trunc
+                .remove(&self.hash(txid))
+                .map(|b| deserialize(&b).unwrap())
         }
     }
 
@@ -44,7 +46,7 @@ impl TruncMap {
         (self.trunc.len(), self.full.len())
     }
 
-    fn hash(&self, outpoint: &OutPoint) -> u64 {
+    fn hash(&self, outpoint: &Txid) -> u64 {
         let mut hasher = self.build_hasher.build_hasher();
         outpoint.hash(&mut hasher);
         hasher.finish()
@@ -54,10 +56,10 @@ impl TruncMap {
 impl Default for TruncMap {
     fn default() -> Self {
         TruncMap {
-            trunc: HashMap::<u64, TxOut, PassthroughHasher>::with_hasher(
+            trunc: HashMap::<u64, Box<[u8]>, PassthroughHasher>::with_hasher(
                 PassthroughHasher::default(),
             ),
-            full: HashMap::new(),
+            full: FxHashMap::default(),
             build_hasher: Default::default(),
         }
     }
