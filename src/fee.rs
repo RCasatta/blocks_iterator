@@ -68,7 +68,11 @@ impl Fee {
                     total_txs += block_extra.block.txdata.len() as u64;
 
                     if block_extra.height % 10_000 == 0 {
-                        info!("tx in utxo: {:?}", self.utxo.0.len())
+                        info!(
+                            "(utxo, collision): {:?} script on stack: {:.0}%",
+                            self.utxo.0.len(),
+                            self.utxo.0.script_on_stack() * 100.0
+                        );
                     }
                     for tx in block_extra.block.txdata.iter() {
                         let txid = self.utxo.add(tx, self.skip_script_pubkey);
