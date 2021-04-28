@@ -68,9 +68,11 @@ impl Fee {
                     total_txs += block_extra.block.txdata.len() as u64;
 
                     if block_extra.height % 10_000 == 0 {
+                        let (utxo_size, collision_size, utxo_capacity) = self.utxo.0.len();
                         info!(
-                            "(utxo, collision): {:?} script on stack: {:.0}%",
-                            self.utxo.0.len(),
+                            "(utxo, collision, capacity): {:?} load:{:.1}% script on stack: {:.1}%",
+                            (utxo_size, collision_size, utxo_capacity),
+                            (utxo_size as f64 / utxo_capacity as f64) * 100.0,
                             self.utxo.0.script_on_stack() * 100.0
                         );
                     }

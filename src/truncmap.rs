@@ -96,8 +96,8 @@ impl TruncMap {
         }
     }
 
-    pub fn len(&self) -> (usize, usize) {
-        (self.trunc.len(), self.full.len())
+    pub fn len(&self) -> (usize, usize, usize) {
+        (self.trunc.len(), self.full.len(), self.trunc.capacity())
     }
 
     pub fn script_on_stack(&self) -> f64 {
