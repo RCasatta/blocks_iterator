@@ -14,16 +14,26 @@ pub struct Fee {
     utxo: Utxo,
 }
 
-struct Utxo(TruncMap);
+struct Utxo {
+    map: TruncMap,
+    unspendable: u64,
+}
 
 impl Utxo {
     pub fn new() -> Self {
-        Utxo(TruncMap::default())
+        Utxo {
+            map: TruncMap::default(),
+            unspendable: 0,
+        }
     }
 
     pub fn add(&mut self, tx: &Transaction, skip_script_pubkey: bool) -> Txid {
         let txid = tx.txid();
         for (i, output) in tx.output.iter().enumerate() {
+            if output.script_pubkey.is_provably_unspendable() {
+                self.unspendable += 1;
+                continue;
+            }
             let output = if skip_script_pubkey {
                 let mut output = output.clone();
                 output.script_pubkey = Script::default();
@@ -31,13 +41,13 @@ impl Utxo {
             } else {
                 Cow::Borrowed(output)
             };
-            self.0.insert(OutPoint::new(txid, i as u32), output);
+            self.map.insert(OutPoint::new(txid, i as u32), output);
         }
         txid
     }
 
     pub fn remove(&mut self, outpoint: OutPoint) -> TxOut {
-        self.0.remove(&outpoint).unwrap()
+        self.map.remove(&outpoint).unwrap()
     }
 }
 
@@ -68,12 +78,13 @@ impl Fee {
                     total_txs += block_extra.block.txdata.len() as u64;
 
                     if block_extra.height % 10_000 == 0 {
-                        let (utxo_size, collision_size, utxo_capacity) = self.utxo.0.len();
+                        let (utxo_size, collision_size, utxo_capacity) = self.utxo.map.len();
                         info!(
-                            "(utxo, collision, capacity): {:?} load:{:.1}% script on stack: {:.1}%",
+                            "(utxo, collision, capacity): {:?} load:{:.1}% script on stack: {:.1}% unspendable:{}",
                             (utxo_size, collision_size, utxo_capacity),
                             (utxo_size as f64 / utxo_capacity as f64) * 100.0,
-                            self.utxo.0.script_on_stack() * 100.0
+                            self.utxo.map.script_on_stack() * 100.0,
+                            self.utxo.unspendable,
                         );
                     }
                     for tx in block_extra.block.txdata.iter() {
