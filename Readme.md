@@ -11,7 +11,7 @@ Features:
 
 ## Memory requirements and performance
 
-Running on threadripper 1950X, Testnet @ 1970k, Mainnet @ 681k
+Running [iterate](examples/iterate.rs) example on threadripper 1950X, Testnet @ 1970k, Mainnet @ 681k
 
 | Network | `--skip--prevout` | Memory | Time   |
 |---------|-------------------|-------:|-------:|
@@ -20,6 +20,8 @@ Running on threadripper 1950X, Testnet @ 1970k, Mainnet @ 681k
 | Testnet | false             |  3.2GB |     5m |
 | Testnet | true              |  1.0GB |     3m |
 
-## Example
+## Examples
 
-See [iterate](examples/iterate.rs) example
+* [iterate](examples/iterate.rs) iterate over blocks and print block fee
+* [heaviest](examples/heaviest.rs) find the transaction with greatest weight
+* [most_output](examples/most_output.rs) find the transaction with most output

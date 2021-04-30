@@ -3,6 +3,18 @@
 //! Read bitcoin blocks directory containing `blocks*.dat` files, and produce a ordered stream
 //! of [BlockExtra]
 //!
+
+// Coding conventions
+#![forbid(unsafe_code)]
+#![deny(non_upper_case_globals)]
+#![deny(non_camel_case_types)]
+#![deny(non_snake_case)]
+#![deny(unused_mut)]
+#![deny(dead_code)]
+#![deny(unused_imports)]
+#![deny(missing_docs)]
+#![deny(unused_must_use)]
+
 use bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut, Txid};
 use log::{info, Level};
 use std::collections::{HashMap, HashSet};
