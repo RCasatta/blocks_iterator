@@ -6,13 +6,20 @@
 Iterates over Bitcoin blocks, decoding data inside Bitcoin Core's blocks directory.
 
 Features:
-* Blocks are returned in order, it avoids following reorgs (see `max_reorg` parameter)
-* Blocks come with metadata like all block's previous outputs, it allows computing transactions fee.
-* Scan takes about 1 hour for mainnet (at block 680000) and 5 minutes on testnet (at block 1972337)
+* Blocks are returned in height order, it avoids following reorgs (see `max_reorg` parameter)
+* Blocks come with [metadata](https://docs.rs/blocks_iterator/0.1.0/blocks_iterator/struct.BlockExtra.html) like all block's previous outputs, it allows computing transactions fee.
 
-Handling fee computation in memory requires good amount of ram, about 10GB for testnet and 20GB for mainnet.
-If you are not interested in previous outputs use `--skip-prevout`, ram requirements will be about 1GB for tesnet and 2GB for mainnet.
+## Memory requirements and performance
 
-# Example
+Running on threadripper 1950X, Testnet @ 1970k, Mainnet @ 681k
+
+| Network | `--skip--prevout` | Memory | Time   |
+|---------|-------------------|-------:|-------:|
+| Mainnet | false             | 10.3GB | 1h:00m |
+| Mainnet | true              |  2.7GB |    36m |
+| Testnet | false             |  3.2GB |     5m |
+| Testnet | true              |  1.0GB |     3m |
+
+## Example
 
 See [iterate](examples/iterate.rs) example
