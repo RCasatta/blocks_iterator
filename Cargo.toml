@@ -17,3 +17,22 @@ log = "0.4.11"
 env_logger = "0.7"
 glob = "0.3.0"
 fxhash = "0.2.1"
+
+[features]
+verify = ["bitcoin/bitcoinconsensus"]
+
+[[example]]
+name = "heaviest"
+
+[[example]]
+name = "iterate"
+
+[[example]]
+name = "most_output"
+
+[[example]]
+name = "verify"
+required-features = ["verify"]
+
+[patch.crates-io]
+bitcoin = { git ="https://github.com/RCasatta/rust-bitcoin", branch="verify_flags" }

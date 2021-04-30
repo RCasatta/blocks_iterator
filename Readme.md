@@ -31,6 +31,7 @@ cargo run --release --example iterate
 * [iterate](examples/iterate.rs) iterate over blocks and print block fee
 * [heaviest](examples/heaviest.rs) find the transaction with greatest weight
 * [most_output](examples/most_output.rs) find the transaction with most output
+* [verify](examples/verify.rs) verify transactions
 
 ## Similar projects
 
