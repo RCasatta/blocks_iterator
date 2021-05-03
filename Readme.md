@@ -22,6 +22,22 @@ Running [iterate](examples/iterate.rs) example on threadripper 1950X, Testnet @ 
 
 ## Examples
 
+Run examples with:
+
+```
+cargo run --release --example iterate
+```
+
 * [iterate](examples/iterate.rs) iterate over blocks and print block fee
 * [heaviest](examples/heaviest.rs) find the transaction with greatest weight
 * [most_output](examples/most_output.rs) find the transaction with most output
+
+## Similar projects
+
+* [bitcoin-iterate](https://github.com/rustyrussell/bitcoin-iterate) this project inspired blocks_iterator, the differences are:
+  * bitcoin-iterate is C-based
+  * bitcoin-iterate it's more suited for shell piping, while blocks_itearator is intended to use as a rust library
+  * bitcoin-iterate doesn't give previous outputs information
+  * bitcoin-iterate is making two passage over `blocks*.dat` while blocks_iterator is doing one pass keeping out-order-blocks in memory (the latter is faster at the expense of higher memory usage)
+* [rust-bitcoin-indexer](https://github.com/dpc/rust-bitcoin-indexer) this project requires longer setup times (about 9 hours indexing) and a postgre database, once the indexing is finished it allows fast queries on relational database.
+* [electrs](https://github.com/romanz/electrs) specifically intended for the Electrum protocol
