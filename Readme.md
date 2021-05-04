@@ -7,7 +7,7 @@ Iterates over Bitcoin blocks, decoding data inside Bitcoin Core's blocks directo
 
 Features:
 * Blocks are returned in height order, it avoids following reorgs (see `max_reorg` parameter)
-* Blocks come with [metadata](https://docs.rs/blocks_iterator/latest/blocks_iterator/struct.BlockExtra.html) like all block's previous outputs, it allows computing transactions fee.
+* Blocks come with [metadata](https://docs.rs/blocks_iterator/latest/blocks_iterator/struct.BlockExtra.html) like all block's previous outputs, it allows computing transactions fee or [verifying](examples/verify.rs) scripts in the blockchain.
 
 ## Memory requirements and performance
 
