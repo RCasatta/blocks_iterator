@@ -37,3 +37,4 @@ required-features = ["verify"]
 
 [patch.crates-io]
 bitcoin = { git ="https://github.com/RCasatta/rust-bitcoin", branch="verify_flags" }
+bitcoinconsensus = { git ="https://github.com/RCasatta/rust-bitcoinconsensus", branch="endomorphism" }
