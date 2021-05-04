@@ -1,14 +1,24 @@
 use bitcoin::consensus::serialize;
-use bitcoin::hashes::hex::ToHex;
-use bitcoin::OutPoint;
+use bitcoin::{Amount, Script};
 use blocks_iterator::{periodic_log_level, Config};
 use env_logger::Env;
 use log::{error, info, log};
 use rayon::prelude::*;
 use std::error::Error;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::sync_channel;
+use std::sync::Arc;
+use std::thread;
 use structopt::StructOpt;
+
+const BATCH: usize = 10_000;
+
+struct VerifyData {
+    script_pubkey: Script,
+    index: usize,
+    amount: Amount,
+    spending: Arc<Vec<u8>>,
+    flags: u32,
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
@@ -17,8 +27,41 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::from_args();
     let (send, recv) = sync_channel(100);
     let handle = blocks_iterator::iterate(config, send);
-    let err_count = AtomicU64::new(0);
-    while let Some(block_extra) = recv.recv()? {
+
+    let (send_script, recv_script) = sync_channel(BATCH);
+
+    let process_handle = thread::spawn(move || {
+        let mut buffer: Vec<VerifyData> = Vec::with_capacity(BATCH);
+        let mut last = false;
+        loop {
+            for _ in 0..BATCH {
+                match recv_script.recv().unwrap() {
+                    Some(data) => buffer.push(data),
+                    None => {
+                        last = true;
+                        break;
+                    }
+                }
+            }
+
+            buffer.par_iter().for_each(|data| {
+                if let Err(e) = data.script_pubkey.verify_with_flags(
+                    data.index,
+                    data.amount,
+                    &data.spending,
+                    data.flags,
+                ) {
+                    error!("{:?}", e);
+                }
+            });
+            if last {
+                break;
+            }
+            buffer.clear();
+        }
+    });
+
+    while let Some(mut block_extra) = recv.recv()? {
         log!(
             periodic_log_level(block_extra.height),
             "# {:7} {} {:?}",
@@ -26,35 +69,26 @@ fn main() -> Result<(), Box<dyn Error>> {
             block_extra.block_hash,
             block_extra.fee()
         );
-        block_extra.block.txdata.par_iter().skip(1).for_each(|tx| {
-            if let Err(e) = tx.verify_with_flags(
-                |point: &OutPoint| block_extra.outpoint_values.get(point).cloned(),
-                0u32,
-            ) {
-                //TODO initializa flags correctly (now 0 is none)
-                error!(
-                    "err_{:?} {:?} {} {}",
-                    err_count,
-                    e,
-                    tx.txid(),
-                    serialize(tx).to_hex()
-                );
-                for (i, input) in tx.input.iter().enumerate() {
-                    let prevout = block_extra
-                        .outpoint_values
-                        .get(&input.previous_output)
-                        .unwrap();
-                    error!(
-                        "err_{:?} input_{}: value:{} script_pubkey:{:x} script_sig:{:x}",
-                        err_count, i, prevout.value, prevout.script_pubkey, input.script_sig
-                    );
-                }
-                err_count.fetch_add(1, Ordering::Relaxed);
-                //panic!("");
+        for tx in block_extra.block.txdata.iter().skip(1) {
+            let tx_bytes = serialize(tx);
+            let arc_tx_bytes = Arc::new(tx_bytes);
+            for (i, input) in tx.input.iter().enumerate() {
+                let prevout = block_extra
+                    .outpoint_values
+                    .remove(&input.previous_output)
+                    .unwrap();
+                let data = VerifyData {
+                    script_pubkey: prevout.script_pubkey,
+                    index: i,
+                    amount: Amount::from_sat(prevout.value),
+                    spending: arc_tx_bytes.clone(),
+                    flags: 0,
+                };
+                send_script.send(Some(data))?;
             }
-        });
+        }
     }
+    process_handle.join().expect("couldn't join");
     handle.join().expect("couldn't join");
-    info!("errors: {:?}", err_count);
     Ok(())
 }
