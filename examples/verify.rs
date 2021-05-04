@@ -88,6 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
+    send_script.send(None)?;
     process_handle.join().expect("couldn't join");
     handle.join().expect("couldn't join");
     Ok(())
