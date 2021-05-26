@@ -69,11 +69,12 @@ impl Fee {
                     if block_extra.height % 10_000 == 0 {
                         let (utxo_size, collision_size, utxo_capacity) = self.utxo.map.len();
                         info!(
-                            "(utxo, collision, capacity): {:?} load:{:.1}% script on stack: {:.1}% unspendable:{}",
+                            "(utxo, collision, capacity): {:?} load:{:.1}% script on stack: {:.1}% unspendable:{} over:{}",
                             (utxo_size, collision_size, utxo_capacity),
                             (utxo_size as f64 / utxo_capacity as f64) * 100.0,
                             self.utxo.map.script_on_stack() * 100.0,
                             self.utxo.unspendable,
+                            self.utxo.map.value_over(),
                         );
                     }
                     for tx in block_extra.block.txdata.iter() {
