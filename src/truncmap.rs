@@ -9,11 +9,12 @@ use std::hash::{BuildHasher, Hasher};
 /// It obviously loose the ability to iterate over keys
 pub struct TruncMap {
     /// use a PassthroughHasher since the key it's already an hash
-    trunc: HashMap<u64, (StackScript, u64), PassthroughHasher>,
+    trunc: HashMap<u64, (StackScript, u32), PassthroughHasher>,
     full: FxHashMap<OutPoint, TxOut>,
     build_hasher: fxhash::FxBuildHasher,
     script_stack: u64,
     script_other: u64,
+    value_over: u64,
 }
 
 /// A 24 bytes struct to store most of the script in the blockchain on the stack
@@ -38,7 +39,6 @@ impl StackScript {
 
 impl From<&Script> for StackScript {
     fn from(script: &Script) -> Self {
-        //TODO populate with right hash values
         if script.is_p2pkh() {
             StackScript::P2Pkh(PubkeyHash::from_slice(&script[3..23]).unwrap())
         } else if script.is_p2sh() {
@@ -67,21 +67,26 @@ impl TruncMap {
     /// value is Cow<>, because in the more common case if I would accept TxOut but the caller has &TxOut 2 clones in total would be necessary (1 from the caller and 1 inside) while with the Cow only 1 is needed
     /// when accepting &TxOut but the caller has TxOut, we internally need 1 clone in both cases
     pub fn insert(&mut self, outpoint: OutPoint, tx_out: &TxOut) {
-        let tx_out_stack: (StackScript, u64) = ((&tx_out.script_pubkey).into(), tx_out.value);
-        if tx_out_stack.0.is_other() {
-            self.script_other += 1;
-        } else {
-            self.script_stack += 1;
-        }
-
-        // we optimistically insert since collision must be rare
-        let old = self.trunc.insert(self.hash(&outpoint), tx_out_stack);
-
-        if let Some(old) = old {
-            // rolling back since the element did exist
-            self.trunc.insert(self.hash(&outpoint), old);
-            // since key collided, saving in the full map
+        if tx_out.value > u32::MAX as u64 {
+            self.value_over += 1;
             self.full.insert(outpoint, tx_out.clone());
+        } else {
+            let tx_out_stack: (StackScript, u32) = ((&tx_out.script_pubkey).into(), tx_out.value as u32);
+            if tx_out_stack.0.is_other() {
+                self.script_other += 1;
+            } else {
+                self.script_stack += 1;
+            }
+
+            // we optimistically insert since collision must be rare
+            let old = self.trunc.insert(self.hash(&outpoint), tx_out_stack);
+
+            if let Some(old) = old {
+                // rolling back since the element did exist
+                self.trunc.insert(self.hash(&outpoint), old);
+                // since key collided, saving in the full map
+                self.full.insert(outpoint, tx_out.clone());
+            }
         }
     }
 
@@ -91,7 +96,7 @@ impl TruncMap {
         } else {
             self.trunc.remove(&self.hash(outpoint)).map(|val| TxOut {
                 script_pubkey: val.0.into(),
-                value: val.1,
+                value: val.1 as u64,
             })
         }
     }
@@ -104,6 +109,10 @@ impl TruncMap {
         self.script_stack as f64 / ((self.script_other + self.script_stack) as f64)
     }
 
+    pub fn value_over(&self) -> u64 {
+        self.value_over
+    }
+
     fn hash(&self, outpoint: &OutPoint) -> u64 {
         let mut hasher = self.build_hasher.build_hasher();
         std::hash::Hash::hash(outpoint, &mut hasher);
@@ -114,13 +123,14 @@ impl TruncMap {
 impl Default for TruncMap {
     fn default() -> Self {
         TruncMap {
-            trunc: HashMap::<u64, (StackScript, u64), PassthroughHasher>::with_hasher(
+            trunc: HashMap::<u64, (StackScript, u32), PassthroughHasher>::with_hasher(
                 PassthroughHasher::default(),
             ),
             full: FxHashMap::default(),
             build_hasher: Default::default(),
             script_other: 0,
             script_stack: 0,
+            value_over: 0,
         }
     }
 }
@@ -171,6 +181,7 @@ mod test {
         assert_eq!(std::mem::size_of::<WScriptHash>(), 32);
         assert_eq!(std::mem::size_of::<Box<[u8]>>(), 16);
         assert_eq!(std::mem::size_of::<(StackScript, u64)>(), 32);
+        assert_eq!(std::mem::size_of::<(StackScript, u32)>(), 32);
     }
 
     #[test]
