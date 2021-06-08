@@ -1,5 +1,5 @@
-use bitcoin::consensus::serialize;
-use bitcoin::{Amount, Script};
+use bitcoin::consensus::{deserialize, serialize};
+use bitcoin::{Amount, Script, Transaction};
 use bitcoinconsensus::height_to_flags;
 use blocks_iterator::{periodic_log_level, Config};
 use env_logger::Env;
@@ -57,6 +57,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 ) {
                     error!("{:?}", e);
                     error!("{:?}", data);
+                    let tx: Transaction = deserialize(&data.spending).unwrap();
+                    error!("tx: {}", tx.txid());
                     error_count.fetch_add(1, Ordering::SeqCst);
                 }
             });
