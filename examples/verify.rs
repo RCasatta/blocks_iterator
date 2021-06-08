@@ -6,11 +6,11 @@ use env_logger::Env;
 use log::{error, info, log};
 use rayon::prelude::*;
 use std::error::Error;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
 use std::thread;
 use structopt::StructOpt;
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 const BATCH: usize = 10_000;
 
@@ -98,7 +98,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     send_script.send(None)?;
     process_handle.join().expect("couldn't join");
     handle.join().expect("couldn't join");
-
 
     Ok(())
 }

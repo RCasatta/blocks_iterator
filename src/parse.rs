@@ -30,11 +30,11 @@ impl Parse {
 
     pub fn start(&mut self) {
         let mut total_blocks = 0usize;
-
+        let mut now;
         let mut busy_time = 0u128;
         loop {
             let received = self.receiver.recv().expect("cannot receive blob");
-            let now = Instant::now();
+            now = Instant::now();
             match received {
                 Some(blob) => {
                     let blocks_vec = parse_blocks(self.network.magic(), blob);
@@ -45,11 +45,13 @@ impl Parse {
                         blocks_vec.len(),
                         total_blocks
                     );
-                    busy_time += now.elapsed().as_nanos();
+
                     for block in blocks_vec {
                         if !self.seen.contains(&block.block_hash) {
                             self.seen.insert(block.block_hash);
+                            busy_time += now.elapsed().as_nanos();
                             self.sender.send(Some(block)).unwrap();
+                            now = Instant::now();
                         } else {
                             warn!("duplicate block {}", block.block_hash);
                         }
@@ -58,6 +60,7 @@ impl Parse {
                 None => break,
             }
         }
+
         self.sender.send(None).unwrap();
         info!("ending parser, busy time: {}s", (busy_time / 1_000_000_000));
     }

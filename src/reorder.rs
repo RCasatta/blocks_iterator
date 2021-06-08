@@ -115,9 +115,10 @@ impl Reorder {
     pub fn start(&mut self) {
         let mut busy_time = 0u128;
         let mut count = 0u32;
+        let mut now;
         loop {
             let received = self.receiver.recv().expect("cannot receive blob");
-            let now = Instant::now();
+            now = Instant::now();
             match received {
                 Some(block_extra) => {
                     log!(
@@ -141,7 +142,9 @@ impl Reorder {
                     }
                     self.blocks.add(block_extra);
                     while let Some(block_to_send) = self.blocks.remove(&self.next) {
+                        busy_time += now.elapsed().as_nanos();
                         self.send(block_to_send);
+                        now = Instant::now();
                     }
                 }
                 None => break,
@@ -154,10 +157,7 @@ impl Reorder {
             self.blocks.blocks.len(),
             self.blocks.follows.len()
         );
-        info!(
-            "ending reorder, busy time(*): {}s",
-            busy_time / 1_000_000_000
-        );
+        info!("ending reorder, busy time: {}s", busy_time / 1_000_000_000);
         self.sender.send(None).expect("reorder cannot send none");
     }
 }
