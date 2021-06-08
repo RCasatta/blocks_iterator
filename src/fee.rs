@@ -1,7 +1,8 @@
 use crate::truncmap::TruncMap;
 use crate::BlockExtra;
-use bitcoin::{OutPoint, Script, Transaction, TxOut, Txid};
+use bitcoin::{OutPoint, Script, TxOut};
 use log::{debug, info, trace};
+use std::collections::HashSet;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::time::Instant;
@@ -25,16 +26,12 @@ impl Utxo {
         }
     }
 
-    pub fn add(&mut self, tx: &Transaction) -> Txid {
-        let txid = tx.txid();
-        for (i, output) in tx.output.iter().enumerate() {
-            if output.script_pubkey.is_provably_unspendable() {
-                self.unspendable += 1;
-                continue;
-            }
-            self.map.insert(OutPoint::new(txid, i as u32), output);
+    pub fn add(&mut self, out_point: OutPoint, output: &TxOut) {
+        if output.script_pubkey.is_provably_unspendable() {
+            self.unspendable += 1;
+        } else {
+            self.map.insert(out_point, output);
         }
-        txid
     }
 
     pub fn remove(&mut self, outpoint: OutPoint) -> TxOut {
@@ -76,8 +73,30 @@ impl Fee {
                             self.utxo.unspendable,
                         );
                     }
+
+                    // spent_in_block is an optimization to avoid hitting the utxo map with outputs
+                    // spent in the same block, should improve caching by using a smaller data struct
+                    // and avoid the double lookup of the trunc map
+                    let spent_in_block: HashSet<_> = block_extra
+                        .block
+                        .txdata
+                        .iter()
+                        .flat_map(|a| a.input.iter())
+                        .map(|a| &a.previous_output)
+                        .collect();
                     for tx in block_extra.block.txdata.iter() {
-                        let txid = self.utxo.add(tx);
+                        let txid = tx.txid();
+                        for (i, output) in tx.output.iter().enumerate() {
+                            let out_point = OutPoint::new(txid, i as u32);
+                            if spent_in_block.contains(&out_point) {
+                                block_extra
+                                    .outpoint_values
+                                    .insert(out_point, output.clone());
+                            } else {
+                                self.utxo.add(out_point, output);
+                            }
+                        }
+
                         block_extra.tx_hashes.insert(txid);
                     }
 
