@@ -1,5 +1,6 @@
 use bitcoin::consensus::serialize;
 use bitcoin::{Amount, Script};
+use bitcoinconsensus::height_to_flags;
 use blocks_iterator::{periodic_log_level, Config};
 use env_logger::Env;
 use log::{error, info, log};
@@ -82,7 +83,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     index: i,
                     amount: Amount::from_sat(prevout.value),
                     spending: arc_tx_bytes.clone(),
-                    flags: 0, // TODO this should change with height enforcing soft-forks like bip66
+                    flags: height_to_flags(block_extra.height),
                 };
                 send_script.send(Some(data))?;
             }

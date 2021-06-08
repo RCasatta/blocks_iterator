@@ -11,16 +11,17 @@ readme = "Readme.md"
 license = "MIT"
 
 [dependencies]
-bitcoin = "0.26.0"
+bitcoin = "0.26.1"
 structopt = "0.3.21"
 log = "0.4.11"
 env_logger = "0.7"
 glob = "0.3.0"
 fxhash = "0.2.1"
-rayon = {version = "1.5.0", optional = true }
+rayon = { version = "1.5.0", optional = true }
+bitcoinconsensus = { version = "0.19.0-3", optional = true }
 
 [features]
-verify = ["bitcoin/bitcoinconsensus", "rayon"]
+verify = ["bitcoin/bitcoinconsensus", "rayon", "bitcoinconsensus"]
 
 [[example]]
 name = "heaviest"
@@ -34,7 +35,3 @@ name = "most_output"
 [[example]]
 name = "verify"
 required-features = ["verify"]
-
-[patch.crates-io]
-bitcoin = { git ="https://github.com/RCasatta/rust-bitcoin", branch="verify_flags" }
-bitcoinconsensus = { git ="https://github.com/RCasatta/rust-bitcoinconsensus", branch="endomorphism" }
