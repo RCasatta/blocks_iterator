@@ -10,9 +10,11 @@ use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
 use std::thread;
 use structopt::StructOpt;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 const BATCH: usize = 10_000;
 
+#[derive(Debug)]
 struct VerifyData {
     script_pubkey: Script,
     index: usize,
@@ -32,6 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (send_script, recv_script) = sync_channel(BATCH);
 
     let process_handle = thread::spawn(move || {
+        let error_count = AtomicUsize::new(0);
         let mut buffer: Vec<VerifyData> = Vec::with_capacity(BATCH);
         let mut last = false;
         loop {
@@ -53,6 +56,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                     data.flags,
                 ) {
                     error!("{:?}", e);
+                    error!("{:?}", data);
+                    error_count.fetch_add(1, Ordering::SeqCst);
                 }
             });
             if last {
@@ -60,6 +65,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             buffer.clear();
         }
+        println!("errors: {:?}", error_count);
     });
 
     while let Some(mut block_extra) = recv.recv()? {
@@ -92,5 +98,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     send_script.send(None)?;
     process_handle.join().expect("couldn't join");
     handle.join().expect("couldn't join");
+
+
     Ok(())
 }
