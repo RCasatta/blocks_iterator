@@ -18,14 +18,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (send, recv) = sync_channel(100);
     let handle = blocks_iterator::iterate(config, send);
     let mut signatures_in_witness = 0;
+    let mut block_with_witness;
+    let mut blocks_with_witness = 0;
     while let Some(block_extra) = recv.recv()? {
+        block_with_witness = false;
         log!(
             periodic_log_level(block_extra.height),
-            "# {:7} {} {:?} signatures_in_witness:{}",
+            "# {:7} {} {:?} sig_wit:{} blk_wit:{}",
             block_extra.height,
             block_extra.block_hash,
             block_extra.fee(),
-            signatures_in_witness
+            signatures_in_witness,
+            blocks_with_witness
         );
 
         for tx in block_extra.block.txdata {
@@ -33,13 +37,20 @@ fn main() -> Result<(), Box<dyn Error>> {
                 for witness in input.witness {
                     if let Ok(_sig) = deserialize::<ParsedSignature>(&witness) {
                         signatures_in_witness += 1;
+                        block_with_witness = true;
                     }
                 }
             }
         }
+        if block_with_witness {
+            blocks_with_witness += 1;
+        }
     }
     handle.join().expect("couldn't join");
-    info!("signatures_in_witness: {}", signatures_in_witness);
+    info!(
+        "signatures_in_witness: {} blocks_with_witness: {}",
+        signatures_in_witness, blocks_with_witness
+    );
     Ok(())
 }
 
