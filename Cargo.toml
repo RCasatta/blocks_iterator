@@ -11,7 +11,7 @@ readme = "Readme.md"
 license = "MIT"
 
 [dependencies]
-bitcoin = "0.26.1"
+bitcoin = "0.26"
 structopt = "0.3.21"
 log = "0.4.11"
 env_logger = "0.7"
@@ -35,6 +35,9 @@ name = "most_output"
 [[example]]
 name = "verify"
 required-features = ["verify"]
+
+[[example]]
+name = "signatures_in_witness"
 
 [patch.crates-io]
 bitcoinconsensus = { git ="https://github.com/RCasatta/rust-bitcoinconsensus", rev="cfb640f0f0ed6a968e4925e9dd92d3778e6f92fa" }
