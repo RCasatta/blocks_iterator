@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     config.skip_prevout = true;
     let (send, recv) = sync_channel(100);
     let handle = blocks_iterator::iterate(config, send);
-    let mut counters = [0usize; 16];
+    let mut counters = [0usize; 17];
     while let Some(block_extra) = recv.recv()? {
         log!(
             periodic_log_level(block_extra.height),
@@ -36,7 +36,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         for tx in block_extra.block.txdata {
             for (i, output) in tx.output.iter().enumerate() {
                 if output.script_pubkey.is_witness_program() {
-                    let version = output.script_pubkey.as_bytes()[0] as usize;
+                    let mut version = output.script_pubkey.as_bytes()[0] as usize;
+                    if version > 0x50 {
+                        version -= 0x50;
+                    }
                     counters[version] += 1;
                     if version >= 1 {
                         info!("tx:{} output:{} version:{}", tx.txid(), i, version);
