@@ -26,11 +26,21 @@ fn main() -> Result<(), Box<dyn Error>> {
             counters
         );
 
+        if block_extra.height == 481824 {
+            info!("segwit locked in");
+        }
+        if block_extra.height == 687456 {
+            info!("taproot locked in");
+        }
+
         for tx in block_extra.block.txdata {
-            for output in tx.output {
+            for (i, output) in tx.output.iter().enumerate() {
                 if output.script_pubkey.is_witness_program() {
                     let version = output.script_pubkey.as_bytes()[0] as usize;
                     counters[version] += 1;
+                    if version >= 1 {
+                        info!("tx:{} output:{} version:{}", tx.txid(), i, version);
+                    }
                 }
             }
         }

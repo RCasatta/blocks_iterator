@@ -1,7 +1,7 @@
 use crate::BlockExtra;
 use bitcoin::consensus::{deserialize, Decodable};
 use bitcoin::{Block, BlockHash, Network};
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use std::collections::{HashMap, HashSet};
 use std::io::{Cursor, Seek, SeekFrom};
 use std::sync::mpsc::{Receiver, SyncSender};
@@ -40,7 +40,7 @@ impl Parse {
                     let blocks_vec = parse_blocks(self.network.magic(), blob);
 
                     total_blocks += blocks_vec.len();
-                    info!(
+                    debug!(
                         "This blob contain {} blocks (total {})",
                         blocks_vec.len(),
                         total_blocks

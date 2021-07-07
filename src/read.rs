@@ -1,4 +1,4 @@
-use log::info;
+use log::{debug, info};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
@@ -29,7 +29,7 @@ impl Read {
             let now = Instant::now();
             let blob = fs::read(path).unwrap_or_else(|_| panic!("failed to read {:?}", path));
             let len = blob.len();
-            info!("read {} of {:?}", len, path);
+            debug!("read {} of {:?}", len, path);
             busy_time += now.elapsed().as_nanos();
             self.sender.send(Some(blob)).expect("cannot send");
         }
