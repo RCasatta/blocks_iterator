@@ -39,5 +39,9 @@ required-features = ["verify"]
 [[example]]
 name = "signatures_in_witness"
 
+[[example]]
+name = "outputs_versions"
+
+
 [patch.crates-io]
 bitcoinconsensus = { git ="https://github.com/RCasatta/rust-bitcoinconsensus", rev="cfb640f0f0ed6a968e4925e9dd92d3778e6f92fa" }
