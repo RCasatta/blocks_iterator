@@ -5,10 +5,10 @@ use blocks_iterator::Config;
 use env_logger::Env;
 use log::{info, log};
 use std::error::Error;
-use std::sync::mpsc::sync_channel;
-use structopt::StructOpt;
 use std::fs::File;
 use std::io::Write;
+use std::sync::mpsc::sync_channel;
+use structopt::StructOpt;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
@@ -45,7 +45,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
                     counters[version] += 1;
                     if version >= 1 {
-                        let log_line = format!("tx:{} output:{} version:{} height:{}", tx.txid(), i, version, block_extra.height);
+                        let log_line = format!(
+                            "tx:{} output:{} version:{} height:{}",
+                            tx.txid(),
+                            i,
+                            version,
+                            block_extra.height
+                        );
                         info!("{}", log_line);
                         output_file.write(log_line.as_bytes()).unwrap();
                         output_file.write(b"\n").unwrap();

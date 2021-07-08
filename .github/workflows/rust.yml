@@ -42,7 +42,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [ "heaviest", "iterate", "most_output", "verify --features verify"]
+        example: [ "heaviest", "iterate", "most_output", "verify --features verify", "signatures_in_witness", "outputs_versions"]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
