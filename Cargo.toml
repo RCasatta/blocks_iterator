@@ -46,4 +46,4 @@ name = "outputs_versions"
 
 
 [patch.crates-io]
-bitcoinconsensus = { git ="https://github.com/RCasatta/rust-bitcoinconsensus", rev="cfb640f0f0ed6a968e4925e9dd92d3778e6f92fa" }
+bitcoinconsensus = { git ="https://github.com/RCasatta/rust-bitcoinconsensus", rev="12a909866d5346fc79e3c068f3c15bee1e3e7342" }
