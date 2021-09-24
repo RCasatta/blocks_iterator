@@ -1,6 +1,6 @@
 [package]
 name = "blocks_iterator"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Riccardo Casatta <riccardo@casatta.it>"]
 edition = "2018"
 description = "Iterates Bitcoin blocks"
