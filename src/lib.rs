@@ -31,6 +31,13 @@ mod read;
 mod reorder;
 mod truncmap;
 
+// re-exporting deps
+pub use bitcoin;
+pub use fxhash;
+pub use glob;
+pub use log;
+pub use structopt;
+
 /// Configuration parameters, most important the bitcoin blocks directory
 #[derive(StructOpt, Debug, Clone)]
 pub struct Config {
