@@ -58,11 +58,13 @@ impl Fee {
         info!("starting fee processer");
         let mut busy_time = 0u128;
         let mut total_txs = 0u64;
+        let mut last_height = 0;
         loop {
             let received = self.receiver.recv().unwrap();
             let now = Instant::now();
             match received {
                 Some(mut block_extra) => {
+                    last_height = block_extra.height;
                     trace!("fee received: {}", block_extra.block_hash);
                     total_txs += block_extra.block.txdata.len() as u64;
 
@@ -122,9 +124,10 @@ impl Fee {
         self.sender.send(None).expect("fee: cannot send none");
 
         info!(
-            "ending fee processer total tx {}, busy time: {}s",
+            "ending fee processer total tx {}, busy time: {}s, last height: {}",
             total_txs,
-            busy_time / 1_000_000_000
+            busy_time / 1_000_000_000,
+            last_height
         );
     }
 }
