@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("start");
 
     let config = Config::from_args();
-    let (send, recv) = sync_channel(100);
+    let (send, recv) = sync_channel(0);
     let handle = blocks_iterator::iterate(config, send);
     let mut most_output: (Txid, usize) = (Txid::default(), 0);
     while let Some(block_extra) = recv.recv()? {

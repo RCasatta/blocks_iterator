@@ -28,10 +28,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("start");
 
     let config = Config::from_args();
-    let (send, recv) = sync_channel(100);
+    let (send, recv) = sync_channel(0);
     let handle = blocks_iterator::iterate(config, send);
 
-    let (send_script, recv_script) = sync_channel(BATCH);
+    let (send_script, recv_script) = sync_channel(0);
 
     let process_handle = thread::spawn(move || {
         let error_count = AtomicUsize::new(0);
