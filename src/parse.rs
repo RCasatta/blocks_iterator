@@ -116,7 +116,6 @@ fn parse_blocks(magic: u32, blob: Vec<u8>) -> Vec<BlockExtra> {
                     height: 0,
                     next: vec![],
                     outpoint_values: HashMap::new(),
-                    tx_hashes: HashSet::new(),
                 })
             }
             Err(e) => error!("error block parsing {:?}", e),

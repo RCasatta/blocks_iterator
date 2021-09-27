@@ -15,9 +15,9 @@
 #![deny(missing_docs)]
 #![deny(unused_must_use)]
 
-use bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut, Txid};
+use bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut};
 use log::{info, Level};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::thread;
@@ -79,8 +79,6 @@ pub struct BlockExtra {
     /// Note that when configuration `skip_script_pubkey` is true, the script is empty,
     /// when `skip_prevout` is true, this map is empty.
     pub outpoint_values: HashMap<OutPoint, TxOut>,
-    /// Precomputed set of txid present in `block`
-    pub tx_hashes: HashSet<Txid>,
 }
 
 impl BlockExtra {

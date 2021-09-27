@@ -79,8 +79,7 @@ impl Fee {
                         );
                     }
                     for tx in block_extra.block.txdata.iter() {
-                        let txid = self.utxo.add(tx);
-                        block_extra.tx_hashes.insert(txid);
+                        self.utxo.add(tx);
                     }
 
                     for tx in block_extra.block.txdata.iter().skip(1) {
