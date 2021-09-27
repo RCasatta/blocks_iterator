@@ -117,20 +117,20 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
     thread::spawn(move || {
         let now = Instant::now();
 
-        let (send_blobs, receive_blobs) = sync_channel(2);
+        let (send_blobs, receive_blobs) = sync_channel(0);
 
         let mut read = read::Read::new(config.blocks_dir.clone(), send_blobs);
         let read_handle = thread::spawn(move || {
             read.start();
         });
 
-        let (send_blocks, receive_blocks) = sync_channel(200);
+        let (send_blocks, receive_blocks) = sync_channel(0);
         let mut parse = parse::Parse::new(config.network, receive_blobs, send_blocks);
         let parse_handle = thread::spawn(move || {
             parse.start();
         });
 
-        let (send_ordered_blocks, receive_ordered_blocks) = sync_channel(200);
+        let (send_ordered_blocks, receive_ordered_blocks) = sync_channel(0);
         let send_ordered_blocks = if config.skip_prevout {
             // if skip_prevout is true, we send directly to end step
             channel.clone()
