@@ -3,15 +3,32 @@ use bitcoin::consensus::{deserialize, Decodable};
 use bitcoin::{Block, BlockHash, Network};
 use log::{debug, error, info, warn};
 use std::collections::{HashMap, HashSet};
+use std::convert::TryInto;
 use std::io::{Cursor, Seek, SeekFrom};
 use std::sync::mpsc::{Receiver, SyncSender};
 use std::time::Instant;
 
 pub struct Parse {
     network: Network,
-    seen: HashSet<BlockHash>,
+    seen: Seen,
     receiver: Receiver<Option<Vec<u8>>>,
     sender: SyncSender<Option<BlockExtra>>,
+}
+
+/// Save half memory in comparison to using directly HashSet<BlockHash> while providing enough
+/// bytes to reasonably prevent collisions. Use the non-zero part of the hash
+struct Seen(HashSet<[u8; 12]>);
+impl Seen {
+    fn new() -> Seen {
+        Seen(HashSet::new())
+    }
+    fn contains(&self, hash: &BlockHash) -> bool {
+        self.0.contains(&hash[..12])
+    }
+    fn insert(&mut self, hash: &BlockHash) -> bool {
+        let key: [u8; 12] = (&hash[..12]).try_into().unwrap();
+        self.0.insert(key)
+    }
 }
 
 impl Parse {
@@ -22,7 +39,7 @@ impl Parse {
     ) -> Parse {
         Parse {
             network,
-            seen: HashSet::new(),
+            seen: Seen::new(),
             sender,
             receiver,
         }
@@ -48,7 +65,7 @@ impl Parse {
 
                     for block in blocks_vec {
                         if !self.seen.contains(&block.block_hash) {
-                            self.seen.insert(block.block_hash);
+                            self.seen.insert(&block.block_hash);
                             busy_time += now.elapsed().as_nanos();
                             self.sender.send(Some(block)).unwrap();
                             now = Instant::now();
