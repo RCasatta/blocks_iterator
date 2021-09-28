@@ -63,6 +63,10 @@ pub struct Config {
     /// When parsing testnet blocks, it may be necessary to increase this a lot
     #[structopt(short, long, default_value = "6")]
     pub max_reorg: u8,
+
+    /// Size of the channels used to pass messages between threads
+    #[structopt(short, long, default_value = "0")]
+    pub channels_size: u8,
 }
 
 /// The bitcoin block and additional metadata returned by the [iterate] method
@@ -147,26 +151,27 @@ impl BlockExtra {
 
 /// Read `blocks*.dat` contained in the `config.blocks_dir` directory and returns [BlockExtra]
 /// through a channel supplied from the caller. Blocks returned are ordered from the genesis to the
-/// highest block in the dircetory (minus `config.max_reorg`).
+/// highest block in the directory (minus `config.max_reorg`).
 /// In this call threads are spawned, caller must call [std::thread::JoinHandle::join] on the returning handle.
 pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {
     thread::spawn(move || {
         let now = Instant::now();
 
-        let (send_blobs, receive_blobs) = sync_channel(0);
+        let (send_blobs, receive_blobs) = sync_channel(config.channels_size.into());
 
         let mut read = read::Read::new(config.blocks_dir.clone(), send_blobs);
         let read_handle = thread::spawn(move || {
             read.start();
         });
 
-        let (send_blocks, receive_blocks) = sync_channel(0);
+        let (send_blocks, receive_blocks) = sync_channel(config.channels_size.into());
         let mut parse = parse::Parse::new(config.network, receive_blobs, send_blocks);
         let parse_handle = thread::spawn(move || {
             parse.start();
         });
 
-        let (send_ordered_blocks, receive_ordered_blocks) = sync_channel(0);
+        let (send_ordered_blocks, receive_ordered_blocks) =
+            sync_channel(config.channels_size.into());
         let send_ordered_blocks = if config.skip_prevout {
             // if skip_prevout is true, we send directly to end step
             channel.clone()
