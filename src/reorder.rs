@@ -116,6 +116,7 @@ impl Reorder {
         let mut busy_time = 0u128;
         let mut count = 0u32;
         let mut now;
+        let mut last_height = 0;
         loop {
             let received = self.receiver.recv().expect("cannot receive blob");
             now = Instant::now();
@@ -132,6 +133,7 @@ impl Reorder {
                     );
 
                     count += 1;
+                    last_height = block_extra.height;
 
                     if self.blocks.blocks.len() > 10_000 {
                         for block in self.blocks.blocks.values() {
@@ -157,7 +159,7 @@ impl Reorder {
             self.blocks.blocks.len(),
             self.blocks.follows.len()
         );
-        info!("ending reorder, busy time: {}s", busy_time / 1_000_000_000);
+        info!("ending reorder, busy time: {}s, last height: {}", busy_time / 1_000_000_000, last_height);
         self.sender.send(None).expect("reorder cannot send none");
     }
 }
