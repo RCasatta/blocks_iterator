@@ -1,4 +1,4 @@
-use crate::{periodic_log_level, BlockExtra};
+use crate::{periodic_log_level, BlockExtra, RawBlock};
 use bitcoin::blockdata::constants::genesis_block;
 use bitcoin::{BlockHash, Network};
 use log::{info, log, warn};
@@ -8,7 +8,7 @@ use std::sync::mpsc::SyncSender;
 use std::time::Instant;
 
 pub struct Reorder {
-    receiver: Receiver<Option<BlockExtra>>,
+    receiver: Receiver<Option<RawBlock>>,
     sender: SyncSender<Option<BlockExtra>>,
     height: u32,
     next: BlockHash,
@@ -16,7 +16,7 @@ pub struct Reorder {
 }
 
 struct OutOfOrderBlocks {
-    blocks: HashMap<BlockHash, BlockExtra>,
+    blocks: HashMap<BlockHash, RawBlock>,
     follows: HashMap<BlockHash, Vec<BlockHash>>,
     max_reorg: u8,
 }
@@ -30,24 +30,24 @@ impl OutOfOrderBlocks {
         }
     }
 
-    fn add(&mut self, mut block_extra: BlockExtra) {
-        let prev_hash = block_extra.block.header.prev_blockhash;
+    fn add(&mut self, mut raw_block: RawBlock) {
+        let prev_hash = raw_block.prev;
         self.follows
             .entry(prev_hash)
-            .and_modify(|e| e.push(block_extra.block_hash))
-            .or_insert_with(|| vec![block_extra.block_hash]);
+            .and_modify(|e| e.push(raw_block.hash))
+            .or_insert_with(|| vec![raw_block.hash]);
 
-        if let Some(follows) = self.follows.remove(&block_extra.block_hash) {
+        if let Some(follows) = self.follows.remove(&raw_block.hash) {
             for el in follows {
-                block_extra.next.push(el);
+                raw_block.next.push(el);
             }
         }
 
         if let Some(prev_block) = self.blocks.get_mut(&prev_hash) {
-            prev_block.next.push(block_extra.block_hash);
+            prev_block.next.push(raw_block.hash);
         }
 
-        self.blocks.insert(block_extra.block_hash, block_extra);
+        self.blocks.insert(raw_block.hash, raw_block);
     }
 
     /// check the block identified by `hash` has at least `self.max_reorgs` blocks after, to be sure it's not a reorged block
@@ -68,14 +68,11 @@ impl OutOfOrderBlocks {
         None
     }
 
-    fn remove(&mut self, hash: &BlockHash) -> Option<BlockExtra> {
+    fn remove(&mut self, hash: &BlockHash) -> Option<RawBlock> {
         if let Some(next) = self.exist_and_has_followers(hash, vec![]) {
             let mut value = self.blocks.remove(hash).unwrap();
             if value.next.len() > 1 {
-                warn!(
-                    "at {} fork to {:?} took {}",
-                    value.block_hash, value.next, next
-                );
+                warn!("at {} fork to {:?} took {}", value.hash, value.next, next);
             }
             value.next = vec![next];
             Some(value)
@@ -89,7 +86,7 @@ impl Reorder {
     pub fn new(
         network: Network,
         max_reorg: u8,
-        receiver: Receiver<Option<BlockExtra>>,
+        receiver: Receiver<Option<RawBlock>>,
         sender: SyncSender<Option<BlockExtra>>,
     ) -> Reorder {
         Reorder {
@@ -121,11 +118,11 @@ impl Reorder {
             let received = self.receiver.recv().expect("cannot receive blob");
             now = Instant::now();
             match received {
-                Some(block_extra) => {
+                Some(raw_block) => {
                     log!(
                         periodic_log_level(count),
                         "reorder receive:{} size:{} follows:{} height:{} next:{}",
-                        block_extra.block_hash,
+                        raw_block.hash,
                         self.blocks.blocks.len(),
                         self.blocks.follows.len(),
                         self.height,
@@ -133,20 +130,21 @@ impl Reorder {
                     );
 
                     count += 1;
-                    last_height = block_extra.height;
 
                     if self.blocks.blocks.len() > 10_000 {
                         for block in self.blocks.blocks.values() {
-                            println!("{} {:?}", block.block_hash, block.next);
+                            println!("{} {:?}", block.hash, block.next);
                         }
                         println!("next: {}", self.next);
                         panic!();
                     }
-                    self.blocks.add(block_extra);
+                    self.blocks.add(raw_block);
                     while let Some(block_to_send) = self.blocks.remove(&self.next) {
+                        let block_extra: BlockExtra = block_to_send.into();
                         busy_time += now.elapsed().as_nanos();
-                        self.send(block_to_send);
+                        self.send(block_extra);
                         now = Instant::now();
+                        last_height = self.height;
                     }
                 }
                 None => break,
@@ -159,7 +157,11 @@ impl Reorder {
             self.blocks.blocks.len(),
             self.blocks.follows.len()
         );
-        info!("ending reorder, busy time: {}s, last height: {}", busy_time / 1_000_000_000, last_height);
+        info!(
+            "ending reorder, busy time: {}s, last height: {}",
+            busy_time / 1_000_000_000,
+            last_height
+        );
         self.sender.send(None).expect("reorder cannot send none");
     }
 }

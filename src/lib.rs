@@ -12,7 +12,7 @@
 #![deny(unused_mut)]
 #![deny(dead_code)]
 #![deny(unused_imports)]
-#![deny(missing_docs)]
+//#![deny(missing_docs)]
 #![deny(unused_must_use)]
 
 use bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut};
@@ -33,6 +33,7 @@ mod truncmap;
 
 // re-exporting deps
 pub use bitcoin;
+use bitcoin::consensus::deserialize;
 pub use fxhash;
 pub use glob;
 pub use log;
@@ -79,6 +80,28 @@ pub struct BlockExtra {
     /// Note that when configuration `skip_script_pubkey` is true, the script is empty,
     /// when `skip_prevout` is true, this map is empty.
     pub outpoint_values: HashMap<OutPoint, TxOut>,
+}
+
+/// Before reorder we keep the raw data
+#[derive(Debug)]
+pub struct RawBlock {
+    pub block: Vec<u8>,
+    pub hash: BlockHash,
+    pub prev: BlockHash,
+    pub next: Vec<BlockHash>,
+}
+
+impl From<RawBlock> for BlockExtra {
+    fn from(raw_block: RawBlock) -> Self {
+        BlockExtra {
+            block: deserialize(&raw_block.block).unwrap(),
+            block_hash: raw_block.hash,
+            size: raw_block.block.len() as u32,
+            next: raw_block.next,
+            height: 0,
+            outpoint_values: Default::default(),
+        }
+    }
 }
 
 impl BlockExtra {

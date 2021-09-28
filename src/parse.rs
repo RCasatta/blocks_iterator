@@ -1,8 +1,8 @@
-use crate::BlockExtra;
+use crate::RawBlock;
 use bitcoin::consensus::{deserialize, Decodable};
 use bitcoin::{Block, BlockHash, Network};
 use log::{debug, error, info, warn};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::convert::TryInto;
 use std::io::{Cursor, Seek, SeekFrom};
 use std::sync::mpsc::{Receiver, SyncSender};
@@ -12,7 +12,7 @@ pub struct Parse {
     network: Network,
     seen: Seen,
     receiver: Receiver<Option<Vec<u8>>>,
-    sender: SyncSender<Option<BlockExtra>>,
+    sender: SyncSender<Option<RawBlock>>,
 }
 
 /// Save half memory in comparison to using directly HashSet<BlockHash> while providing enough
@@ -35,7 +35,7 @@ impl Parse {
     pub fn new(
         network: Network,
         receiver: Receiver<Option<Vec<u8>>>,
-        sender: SyncSender<Option<BlockExtra>>,
+        sender: SyncSender<Option<RawBlock>>,
     ) -> Parse {
         Parse {
             network,
@@ -64,13 +64,13 @@ impl Parse {
                     );
 
                     for block in blocks_vec {
-                        if !self.seen.contains(&block.block_hash) {
-                            self.seen.insert(&block.block_hash);
+                        if !self.seen.contains(&block.hash) {
+                            self.seen.insert(&block.hash);
                             busy_time += now.elapsed().as_nanos();
                             self.sender.send(Some(block)).unwrap();
                             now = Instant::now();
                         } else {
-                            warn!("duplicate block {}", block.block_hash);
+                            warn!("duplicate block {}", block.hash);
                         }
                     }
                 }
@@ -83,7 +83,7 @@ impl Parse {
     }
 }
 
-fn parse_blocks(magic: u32, blob: Vec<u8>) -> Vec<BlockExtra> {
+fn parse_blocks(magic: u32, blob: Vec<u8>) -> Vec<RawBlock> {
     let mut cursor = Cursor::new(&blob);
     let mut blocks = vec![];
     let max_pos = blob.len() as u64;
@@ -108,14 +108,14 @@ fn parse_blocks(magic: u32, blob: Vec<u8>) -> Vec<BlockExtra> {
 
         match deserialize::<Block>(&blob[start..end]) {
             Ok(block) => {
-                let block_hash = block.block_hash();
-                blocks.push(BlockExtra {
-                    block,
-                    block_hash,
-                    size: (end - start) as u32,
-                    height: 0,
+                let hash = block.block_hash();
+                let prev = block.header.prev_blockhash;
+
+                blocks.push(RawBlock {
+                    block: blob[start..end].to_vec(),
+                    hash,
+                    prev,
                     next: vec![],
-                    outpoint_values: HashMap::new(),
                 })
             }
             Err(e) => error!("error block parsing {:?}", e),
