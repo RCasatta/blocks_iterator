@@ -18,6 +18,7 @@
 use bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut};
 use log::{info, Level};
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use std::path::PathBuf;
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::thread;
@@ -33,10 +34,12 @@ mod truncmap;
 
 // re-exporting deps
 pub use bitcoin;
-use bitcoin::consensus::deserialize;
+use bitcoin::consensus::Decodable;
 pub use fxhash;
 pub use glob;
 pub use log;
+use std::fs::File;
+use std::io::{BufReader, Seek, SeekFrom};
 pub use structopt;
 
 /// Configuration parameters, most important the bitcoin blocks directory
@@ -82,25 +85,37 @@ pub struct BlockExtra {
     pub outpoint_values: HashMap<OutPoint, TxOut>,
 }
 
-/// Before reorder we keep the raw data
+/// Before reorder we keep only the position of the block in the file system and data relative
+/// to the block hash, the previous hash and the following hash (populated during reorder phase)
+/// We will need to read the block from disk again, but by doing so we will avoid using too much
+/// memory in the [`OutOfOrderBlocks`] map.
 #[derive(Debug)]
-pub struct RawBlock {
-    pub block: Vec<u8>,
+pub struct FsBlock {
+    pub path: PathBuf,
+    pub start: usize,
+    pub end: usize,
     pub hash: BlockHash,
     pub prev: BlockHash,
     pub next: Vec<BlockHash>,
 }
 
-impl From<RawBlock> for BlockExtra {
-    fn from(raw_block: RawBlock) -> Self {
-        BlockExtra {
-            block: deserialize(&raw_block.block).unwrap(),
+impl TryFrom<FsBlock> for BlockExtra {
+    type Error = ();
+
+    fn try_from(raw_block: FsBlock) -> Result<Self, Self::Error> {
+        let mut block_file = File::open(raw_block.path).map_err(|_| ())?;
+        block_file
+            .seek(SeekFrom::Start(raw_block.start as u64))
+            .map_err(|_| ())?;
+        let reader = BufReader::new(block_file);
+        Ok(BlockExtra {
+            block: Block::consensus_decode(reader).map_err(|_| ())?,
             block_hash: raw_block.hash,
-            size: raw_block.block.len() as u32,
+            size: (raw_block.end - raw_block.start) as u32,
             next: raw_block.next,
             height: 0,
             outpoint_values: Default::default(),
-        }
+        })
     }
 }
 

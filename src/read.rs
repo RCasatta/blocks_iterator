@@ -6,11 +6,16 @@ use std::time::Instant;
 
 pub struct Read {
     blocks_dir: PathBuf,
-    sender: SyncSender<Option<Vec<u8>>>,
+    sender: SyncSender<Option<PathWithContent>>,
+}
+
+pub struct PathWithContent {
+    pub path: PathBuf,
+    pub content: Vec<u8>,
 }
 
 impl Read {
-    pub fn new(blocks_dir: PathBuf, sender: SyncSender<Option<Vec<u8>>>) -> Self {
+    pub fn new(blocks_dir: PathBuf, sender: SyncSender<Option<PathWithContent>>) -> Self {
         Read { blocks_dir, sender }
     }
 
@@ -25,13 +30,15 @@ impl Read {
         paths.sort();
         info!("There are {} block files", paths.len());
         let mut busy_time = 0u128;
-        for path in paths.iter() {
+        for path in paths {
             let now = Instant::now();
-            let blob = fs::read(path).unwrap_or_else(|_| panic!("failed to read {:?}", path));
-            let len = blob.len();
-            debug!("read {} of {:?}", len, path);
+            let content = fs::read(&path).unwrap_or_else(|_| panic!("failed to read {:?}", path));
+            let len = content.len();
+            debug!("read {} of {:?}", len, &path);
             busy_time += now.elapsed().as_nanos();
-            self.sender.send(Some(blob)).expect("cannot send");
+            self.sender
+                .send(Some(PathWithContent { path, content }))
+                .expect("cannot send");
         }
         self.sender.send(None).expect("cannot send");
         info!("ending reader, busy time: {}s", (busy_time / 1_000_000_000));

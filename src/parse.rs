@@ -1,4 +1,5 @@
-use crate::RawBlock;
+use crate::read::PathWithContent;
+use crate::FsBlock;
 use bitcoin::consensus::{deserialize, Decodable};
 use bitcoin::{Block, BlockHash, Network};
 use log::{debug, error, info, warn};
@@ -11,8 +12,8 @@ use std::time::Instant;
 pub struct Parse {
     network: Network,
     seen: Seen,
-    receiver: Receiver<Option<Vec<u8>>>,
-    sender: SyncSender<Option<RawBlock>>,
+    receiver: Receiver<Option<PathWithContent>>,
+    sender: SyncSender<Option<FsBlock>>,
 }
 
 /// Save half memory in comparison to using directly HashSet<BlockHash> while providing enough
@@ -34,8 +35,8 @@ impl Seen {
 impl Parse {
     pub fn new(
         network: Network,
-        receiver: Receiver<Option<Vec<u8>>>,
-        sender: SyncSender<Option<RawBlock>>,
+        receiver: Receiver<Option<PathWithContent>>,
+        sender: SyncSender<Option<FsBlock>>,
     ) -> Parse {
         Parse {
             network,
@@ -83,10 +84,10 @@ impl Parse {
     }
 }
 
-fn parse_blocks(magic: u32, blob: Vec<u8>) -> Vec<RawBlock> {
-    let mut cursor = Cursor::new(&blob);
+fn parse_blocks(magic: u32, data: PathWithContent) -> Vec<FsBlock> {
+    let mut cursor = Cursor::new(&data.content);
     let mut blocks = vec![];
-    let max_pos = blob.len() as u64;
+    let max_pos = data.content.len() as u64;
     while cursor.position() < max_pos {
         match u32::consensus_decode(&mut cursor) {
             Ok(value) => {
@@ -106,13 +107,15 @@ fn parse_blocks(magic: u32, blob: Vec<u8>) -> Vec<RawBlock> {
             .expect("failed to seek forward");
         let end = cursor.position() as usize;
 
-        match deserialize::<Block>(&blob[start..end]) {
+        match deserialize::<Block>(&data.content[start..end]) {
             Ok(block) => {
                 let hash = block.block_hash();
                 let prev = block.header.prev_blockhash;
 
-                blocks.push(RawBlock {
-                    block: blob[start..end].to_vec(),
+                blocks.push(FsBlock {
+                    start,
+                    end,
+                    path: data.path.clone(),
                     hash,
                     prev,
                     next: vec![],

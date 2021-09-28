@@ -1,14 +1,15 @@
-use crate::{periodic_log_level, BlockExtra, RawBlock};
+use crate::{periodic_log_level, BlockExtra, FsBlock};
 use bitcoin::blockdata::constants::genesis_block;
 use bitcoin::{BlockHash, Network};
 use log::{info, log, warn};
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::time::Instant;
 
 pub struct Reorder {
-    receiver: Receiver<Option<RawBlock>>,
+    receiver: Receiver<Option<FsBlock>>,
     sender: SyncSender<Option<BlockExtra>>,
     height: u32,
     next: BlockHash,
@@ -16,7 +17,7 @@ pub struct Reorder {
 }
 
 struct OutOfOrderBlocks {
-    blocks: HashMap<BlockHash, RawBlock>,
+    blocks: HashMap<BlockHash, FsBlock>,
     follows: HashMap<BlockHash, Vec<BlockHash>>,
     max_reorg: u8,
 }
@@ -30,7 +31,7 @@ impl OutOfOrderBlocks {
         }
     }
 
-    fn add(&mut self, mut raw_block: RawBlock) {
+    fn add(&mut self, mut raw_block: FsBlock) {
         let prev_hash = raw_block.prev;
         self.follows
             .entry(prev_hash)
@@ -68,7 +69,7 @@ impl OutOfOrderBlocks {
         None
     }
 
-    fn remove(&mut self, hash: &BlockHash) -> Option<RawBlock> {
+    fn remove(&mut self, hash: &BlockHash) -> Option<FsBlock> {
         if let Some(next) = self.exist_and_has_followers(hash, vec![]) {
             let mut value = self.blocks.remove(hash).unwrap();
             if value.next.len() > 1 {
@@ -86,7 +87,7 @@ impl Reorder {
     pub fn new(
         network: Network,
         max_reorg: u8,
-        receiver: Receiver<Option<RawBlock>>,
+        receiver: Receiver<Option<FsBlock>>,
         sender: SyncSender<Option<BlockExtra>>,
     ) -> Reorder {
         Reorder {
@@ -140,7 +141,8 @@ impl Reorder {
                     }
                     self.blocks.add(raw_block);
                     while let Some(block_to_send) = self.blocks.remove(&self.next) {
-                        let block_extra: BlockExtra = block_to_send.into();
+                        let block_extra: BlockExtra =
+                            block_to_send.try_into().expect("should find the file");
                         busy_time += now.elapsed().as_nanos();
                         self.send(block_extra);
                         now = Instant::now();
