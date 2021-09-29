@@ -27,8 +27,7 @@ use std::time::Instant;
 use structopt::StructOpt;
 
 mod fee;
-mod parse;
-mod read;
+mod read_parse;
 mod reorder;
 mod truncmap;
 
@@ -38,8 +37,7 @@ use bitcoin::consensus::Decodable;
 pub use fxhash;
 pub use glob;
 pub use log;
-use std::fs::File;
-use std::io::{BufReader, Seek, SeekFrom};
+use std::sync::Arc;
 pub use structopt;
 
 /// Configuration parameters, most important the bitcoin blocks directory
@@ -94,8 +92,8 @@ pub struct BlockExtra {
 /// We will need to read the block from disk again, but by doing so we will avoid using too much
 /// memory in the [`OutOfOrderBlocks`] map.
 #[derive(Debug)]
-pub struct FsBlock {
-    pub path: PathBuf,
+pub struct BlockSlice {
+    pub content: Arc<Vec<u8>>,
     pub start: usize,
     pub end: usize,
     pub hash: BlockHash,
@@ -103,20 +101,17 @@ pub struct FsBlock {
     pub next: Vec<BlockHash>,
 }
 
-impl TryFrom<FsBlock> for BlockExtra {
-    type Error = ();
+impl TryFrom<BlockSlice> for BlockExtra {
+    type Error = bitcoin::Error;
 
-    fn try_from(raw_block: FsBlock) -> Result<Self, Self::Error> {
-        let mut block_file = File::open(raw_block.path).map_err(|_| ())?;
-        block_file
-            .seek(SeekFrom::Start(raw_block.start as u64))
-            .map_err(|_| ())?;
-        let reader = BufReader::new(block_file);
+    fn try_from(block_slice: BlockSlice) -> Result<Self, Self::Error> {
         Ok(BlockExtra {
-            block: Block::consensus_decode(reader).map_err(|_| ())?,
-            block_hash: raw_block.hash,
-            size: (raw_block.end - raw_block.start) as u32,
-            next: raw_block.next,
+            block: Block::consensus_decode(
+                &block_slice.content[block_slice.start..block_slice.end],
+            )?,
+            block_hash: block_slice.hash,
+            size: (block_slice.end - block_slice.start) as u32,
+            next: block_slice.next,
             height: 0,
             outpoint_values: Default::default(),
         })
@@ -157,17 +152,12 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
     thread::spawn(move || {
         let now = Instant::now();
 
-        let (send_blobs, receive_blobs) = sync_channel(config.channels_size.into());
+        let (send_slice, receive_slice) = sync_channel(config.channels_size.into());
 
-        let mut read = read::Read::new(config.blocks_dir.clone(), send_blobs);
-        let read_handle = thread::spawn(move || {
-            read.start();
-        });
-
-        let (send_blocks, receive_blocks) = sync_channel(config.channels_size.into());
-        let mut parse = parse::Parse::new(config.network, receive_blobs, send_blocks);
-        let parse_handle = thread::spawn(move || {
-            parse.start();
+        let mut read_parse =
+            read_parse::ReadParse::new(config.blocks_dir.clone(), config.network, send_slice);
+        let read_parse_handle = thread::spawn(move || {
+            read_parse.start();
         });
 
         let (send_ordered_blocks, receive_ordered_blocks) =
@@ -181,7 +171,7 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
         let mut reorder = reorder::Reorder::new(
             config.network,
             config.max_reorg,
-            receive_blocks,
+            receive_slice,
             send_ordered_blocks,
         );
         let orderer_handle = thread::spawn(move || {
@@ -196,8 +186,7 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
             fee_handle.join().unwrap();
         }
 
-        read_handle.join().unwrap();
-        parse_handle.join().unwrap();
+        read_parse_handle.join().unwrap();
         orderer_handle.join().unwrap();
         info!("Total time elapsed: {}s", now.elapsed().as_secs());
     })

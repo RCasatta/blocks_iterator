@@ -38,7 +38,6 @@ impl StackScript {
 
 impl From<&Script> for StackScript {
     fn from(script: &Script) -> Self {
-        //TODO populate with right hash values
         if script.is_p2pkh() {
             StackScript::P2Pkh(PubkeyHash::from_slice(&script[3..23]).unwrap())
         } else if script.is_p2sh() {

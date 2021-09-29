@@ -1,4 +1,4 @@
-use crate::{periodic_log_level, BlockExtra, FsBlock};
+use crate::{periodic_log_level, BlockExtra, BlockSlice};
 use bitcoin::blockdata::constants::genesis_block;
 use bitcoin::{BlockHash, Network};
 use log::{info, log, warn};
@@ -9,7 +9,7 @@ use std::sync::mpsc::SyncSender;
 use std::time::Instant;
 
 pub struct Reorder {
-    receiver: Receiver<Option<FsBlock>>,
+    receiver: Receiver<Option<BlockSlice>>,
     sender: SyncSender<Option<BlockExtra>>,
     height: u32,
     next: BlockHash,
@@ -17,7 +17,7 @@ pub struct Reorder {
 }
 
 struct OutOfOrderBlocks {
-    blocks: HashMap<BlockHash, FsBlock>,
+    blocks: HashMap<BlockHash, BlockSlice>,
     follows: HashMap<BlockHash, Vec<BlockHash>>,
     max_reorg: u8,
 }
@@ -31,7 +31,7 @@ impl OutOfOrderBlocks {
         }
     }
 
-    fn add(&mut self, mut raw_block: FsBlock) {
+    fn add(&mut self, mut raw_block: BlockSlice) {
         let prev_hash = raw_block.prev;
         self.follows
             .entry(prev_hash)
@@ -69,7 +69,7 @@ impl OutOfOrderBlocks {
         None
     }
 
-    fn remove(&mut self, hash: &BlockHash) -> Option<FsBlock> {
+    fn remove(&mut self, hash: &BlockHash) -> Option<BlockSlice> {
         if let Some(next) = self.exist_and_has_followers(hash, vec![]) {
             let mut value = self.blocks.remove(hash).unwrap();
             if value.next.len() > 1 {
@@ -87,7 +87,7 @@ impl Reorder {
     pub fn new(
         network: Network,
         max_reorg: u8,
-        receiver: Receiver<Option<FsBlock>>,
+        receiver: Receiver<Option<BlockSlice>>,
         sender: SyncSender<Option<BlockExtra>>,
     ) -> Reorder {
         Reorder {
@@ -132,17 +132,18 @@ impl Reorder {
 
                     count += 1;
 
-                    if self.blocks.blocks.len() > 10_000 {
+                    // https://github.com/bitcoin/bitcoin/search?q=BLOCK_DOWNLOAD_WINDOW
+                    if self.blocks.blocks.len() > 1024 {
                         for block in self.blocks.blocks.values() {
                             println!("{} {:?}", block.hash, block.next);
                         }
                         println!("next: {}", self.next);
-                        panic!();
+                        panic!("Found more than 1024 out of order blocks");
                     }
                     self.blocks.add(raw_block);
                     while let Some(block_to_send) = self.blocks.remove(&self.next) {
                         let block_extra: BlockExtra =
-                            block_to_send.try_into().expect("should find the file");
+                            block_to_send.try_into().expect("block deserialization error, during read_parse phase we only test the header");
                         busy_time += now.elapsed().as_nanos();
                         self.send(block_extra);
                         now = Instant::now();
