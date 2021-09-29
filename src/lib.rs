@@ -27,8 +27,7 @@ use std::time::Instant;
 use structopt::StructOpt;
 
 mod fee;
-mod parse;
-mod read;
+mod read_detect;
 mod reorder;
 mod truncmap;
 
@@ -157,17 +156,11 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
     thread::spawn(move || {
         let now = Instant::now();
 
-        let (send_blobs, receive_blobs) = sync_channel(config.channels_size.into());
-
-        let mut read = read::Read::new(config.blocks_dir.clone(), send_blobs);
+        let (send_block_fs, receive_block_fs) = sync_channel(config.channels_size.into());
+        let mut read =
+            read_detect::ReadDetect::new(config.blocks_dir.clone(), config.network, send_block_fs);
         let read_handle = thread::spawn(move || {
             read.start();
-        });
-
-        let (send_blocks, receive_blocks) = sync_channel(config.channels_size.into());
-        let mut parse = parse::Parse::new(config.network, receive_blobs, send_blocks);
-        let parse_handle = thread::spawn(move || {
-            parse.start();
         });
 
         let (send_ordered_blocks, receive_ordered_blocks) =
@@ -181,7 +174,7 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
         let mut reorder = reorder::Reorder::new(
             config.network,
             config.max_reorg,
-            receive_blocks,
+            receive_block_fs,
             send_ordered_blocks,
         );
         let orderer_handle = thread::spawn(move || {
@@ -197,7 +190,6 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
         }
 
         read_handle.join().unwrap();
-        parse_handle.join().unwrap();
         orderer_handle.join().unwrap();
         info!("Total time elapsed: {}s", now.elapsed().as_secs());
     })
