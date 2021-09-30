@@ -20,6 +20,7 @@ impl Read {
     }
 
     pub fn start(&mut self) {
+        let mut now = Instant::now();
         let mut path = self.blocks_dir.clone();
         path.push("blk*.dat");
         info!("listing block files at {:?}", path);
@@ -31,7 +32,6 @@ impl Read {
         info!("There are {} block files", paths.len());
         let mut busy_time = 0u128;
         for path in paths {
-            let now = Instant::now();
             let content = fs::read(&path).unwrap_or_else(|_| panic!("failed to read {:?}", path));
             let len = content.len();
             debug!("read {} of {:?}", len, &path);
@@ -39,6 +39,7 @@ impl Read {
             self.sender
                 .send(Some(PathWithContent { path, content }))
                 .expect("cannot send");
+            now = Instant::now();
         }
         self.sender.send(None).expect("cannot send");
         info!("ending reader, busy time: {}s", (busy_time / 1_000_000_000));

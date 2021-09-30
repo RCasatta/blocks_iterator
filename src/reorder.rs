@@ -99,23 +99,13 @@ impl Reorder {
         }
     }
 
-    fn send(&mut self, mut block_extra: BlockExtra) {
-        self.next = block_extra.next[0];
-        block_extra.height = self.height;
-        self.blocks.follows.remove(&block_extra.block_hash);
-        self.blocks
-            .blocks
-            .remove(&block_extra.block.header.prev_blockhash);
-        self.sender.send(Some(block_extra)).unwrap();
-        self.height += 1;
-    }
-
     pub fn start(&mut self) {
         let mut busy_time = 0u128;
         let mut count = 0u32;
-        let mut now;
+        let mut now = Instant::now();
         let mut last_height = 0;
         loop {
+            busy_time += now.elapsed().as_nanos();
             let received = self.receiver.recv().expect("cannot receive blob");
             now = Instant::now();
             match received {
@@ -141,17 +131,23 @@ impl Reorder {
                     }
                     self.blocks.add(raw_block);
                     while let Some(block_to_send) = self.blocks.remove(&self.next) {
-                        let block_extra: BlockExtra =
+                        let mut block_extra: BlockExtra =
                             block_to_send.try_into().expect("should find the file");
+                        self.next = block_extra.next[0];
+                        block_extra.height = self.height;
+                        self.blocks.follows.remove(&block_extra.block_hash);
+                        self.blocks
+                            .blocks
+                            .remove(&block_extra.block.header.prev_blockhash);
                         busy_time += now.elapsed().as_nanos();
-                        self.send(block_extra);
+                        self.sender.send(Some(block_extra)).unwrap();
                         now = Instant::now();
+                        self.height += 1;
                         last_height = self.height;
                     }
                 }
                 None => break,
             }
-            busy_time += now.elapsed().as_nanos();
         }
         info!(
             "ending reorder next:{} #elements:{} #follows:{}",
@@ -159,6 +155,7 @@ impl Reorder {
             self.blocks.blocks.len(),
             self.blocks.follows.len()
         );
+        busy_time += now.elapsed().as_nanos();
         info!(
             "ending reorder, busy time: {}s, last height: {}",
             busy_time / 1_000_000_000,

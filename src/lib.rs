@@ -157,7 +157,7 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
     thread::spawn(move || {
         let now = Instant::now();
 
-        let (send_blobs, receive_blobs) = sync_channel(config.channels_size.into());
+        let (send_blobs, receive_blobs) = sync_channel(0);
 
         let mut read = read::Read::new(config.blocks_dir.clone(), send_blobs);
         let read_handle = thread::spawn(move || {

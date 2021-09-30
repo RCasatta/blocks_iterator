@@ -1,7 +1,7 @@
 use crate::read::PathWithContent;
 use crate::FsBlock;
-use bitcoin::consensus::{deserialize, Decodable};
-use bitcoin::{Block, BlockHash, Network};
+use bitcoin::consensus::Decodable;
+use bitcoin::{BlockHash, BlockHeader, Network};
 use log::{debug, error, info, warn};
 use std::collections::HashSet;
 use std::convert::TryInto;
@@ -48,81 +48,73 @@ impl Parse {
 
     pub fn start(&mut self) {
         let mut total_blocks = 0usize;
-        let mut now;
+        let mut blocks_in_file = 0usize;
+        let mut now = Instant::now();
         let mut busy_time = 0u128;
         loop {
+            busy_time += now.elapsed().as_nanos();
             let received = self.receiver.recv().expect("cannot receive blob");
             now = Instant::now();
             match received {
-                Some(blob) => {
-                    let blocks_vec = parse_blocks(self.network.magic(), blob);
+                Some(PathWithContent { path, content }) => {
+                    let mut cursor = Cursor::new(&content);
+                    let max_pos = content.len() as u64;
+                    while cursor.position() < max_pos {
+                        match u32::consensus_decode(&mut cursor) {
+                            Ok(value) => {
+                                if self.network.magic() != value {
+                                    cursor
+                                        .seek(SeekFrom::Current(-3))
+                                        .expect("failed to seek back");
+                                    continue;
+                                }
+                            }
+                            Err(_) => break, // EOF
+                        };
+                        let size = u32::consensus_decode(&mut cursor).expect("a");
+                        let start = cursor.position() as usize;
+                        cursor
+                            .seek(SeekFrom::Current(i64::from(size)))
+                            .expect("failed to seek forward");
+                        let end = cursor.position() as usize;
 
-                    total_blocks += blocks_vec.len();
-                    debug!(
-                        "This blob contain {} blocks (total {})",
-                        blocks_vec.len(),
-                        total_blocks
-                    );
-
-                    for block in blocks_vec {
-                        if !self.seen.contains(&block.hash) {
-                            self.seen.insert(&block.hash);
-                            busy_time += now.elapsed().as_nanos();
-                            self.sender.send(Some(block)).unwrap();
-                            now = Instant::now();
-                        } else {
-                            warn!("duplicate block {}", block.hash);
+                        match BlockHeader::consensus_decode(&content[start..]) {
+                            Ok(header) => {
+                                blocks_in_file += 1;
+                                let hash = header.block_hash();
+                                let fs_block = FsBlock {
+                                    start,
+                                    end,
+                                    path: path.clone(),
+                                    hash,
+                                    prev: header.prev_blockhash,
+                                    next: vec![],
+                                };
+                                if !self.seen.contains(&hash) {
+                                    self.seen.insert(&hash);
+                                    busy_time += now.elapsed().as_nanos();
+                                    self.sender.send(Some(fs_block)).unwrap();
+                                    now = Instant::now();
+                                } else {
+                                    warn!("duplicate block {}", hash);
+                                }
+                            }
+                            Err(e) => error!("error block parsing {:?}", e),
                         }
                     }
+
+                    total_blocks += blocks_in_file;
+                    debug!(
+                        "This blob contain {} blocks (total {})",
+                        blocks_in_file, total_blocks
+                    );
                 }
                 None => break,
             }
         }
 
+        busy_time += now.elapsed().as_nanos();
         self.sender.send(None).unwrap();
         info!("ending parser, busy time: {}s", (busy_time / 1_000_000_000));
     }
-}
-
-fn parse_blocks(magic: u32, data: PathWithContent) -> Vec<FsBlock> {
-    let mut cursor = Cursor::new(&data.content);
-    let mut blocks = vec![];
-    let max_pos = data.content.len() as u64;
-    while cursor.position() < max_pos {
-        match u32::consensus_decode(&mut cursor) {
-            Ok(value) => {
-                if magic != value {
-                    cursor
-                        .seek(SeekFrom::Current(-3))
-                        .expect("failed to seek back");
-                    continue;
-                }
-            }
-            Err(_) => break, // EOF
-        };
-        let size = u32::consensus_decode(&mut cursor).expect("a");
-        let start = cursor.position() as usize;
-        cursor
-            .seek(SeekFrom::Current(i64::from(size)))
-            .expect("failed to seek forward");
-        let end = cursor.position() as usize;
-
-        match deserialize::<Block>(&data.content[start..end]) {
-            Ok(block) => {
-                let hash = block.block_hash();
-                let prev = block.header.prev_blockhash;
-
-                blocks.push(FsBlock {
-                    start,
-                    end,
-                    path: data.path.clone(),
-                    hash,
-                    prev,
-                    next: vec![],
-                })
-            }
-            Err(e) => error!("error block parsing {:?}", e),
-        }
-    }
-    blocks
 }
