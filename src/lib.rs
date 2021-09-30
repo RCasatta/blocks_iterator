@@ -156,7 +156,8 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
     thread::spawn(move || {
         let now = Instant::now();
 
-        let (send_block_fs, receive_block_fs) = sync_channel(config.channels_size.into());
+        // FsBlock is a small struct (~120b), so 10_000 is not a problem but allows the read_detect to read ahead the next block file
+        let (send_block_fs, receive_block_fs) = sync_channel(10_000);
         let mut read =
             read_detect::ReadDetect::new(config.blocks_dir.clone(), config.network, send_block_fs);
         let read_handle = thread::spawn(move || {

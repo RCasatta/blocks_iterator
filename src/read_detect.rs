@@ -2,11 +2,11 @@ use crate::bitcoin::consensus::Decodable;
 use crate::bitcoin::{BlockHash, Network};
 use crate::FsBlock;
 use bitcoin::BlockHeader;
-use log::{debug, error, info, warn};
+use log::{error, info, warn};
 use std::collections::HashSet;
 use std::convert::TryInto;
-use std::fs;
-use std::io::{Cursor, Seek, SeekFrom};
+use std::fs::File;
+use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
 use std::time::Instant;
@@ -56,14 +56,17 @@ impl ReadDetect {
         paths.sort();
         info!("There are {} block files", paths.len());
         let mut busy_time = 0u128;
-        for path in paths {
-            let content = fs::read(&path).unwrap_or_else(|_| panic!("failed to read {:?}", path));
-            let len = content.len();
-            debug!("read {} of {:?}", len, &path);
 
+        // https://github.com/bitcoin/bitcoin/search?q=MAX_BLOCKFILE_SIZE
+        let mut content = Vec::with_capacity(0x8000000);
+
+        for path in paths {
+            content.clear();
+            let mut file = File::open(&path).unwrap();
+            file.read_to_end(&mut content).unwrap();
+            info!("read {} of {:?}", content.len(), &path);
             let mut cursor = Cursor::new(&content);
-            let max_pos = content.len() as u64;
-            while cursor.position() < max_pos {
+            while cursor.position() < content.len() as u64 {
                 match u32::consensus_decode(&mut cursor) {
                     Ok(value) => {
                         if self.network.magic() != value {
@@ -94,6 +97,7 @@ impl ReadDetect {
                                 prev: header.prev_blockhash,
                                 next: vec![],
                             };
+
                             busy_time += now.elapsed().as_nanos();
                             self.sender.send(Some(fs_block)).expect("cannot send");
                             now = Instant::now();
