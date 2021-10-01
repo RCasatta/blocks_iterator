@@ -9,7 +9,7 @@ use std::sync::mpsc::SyncSender;
 use std::time::Instant;
 
 pub struct Reorder {
-    receiver: Receiver<Option<FsBlock>>,
+    receiver: Receiver<Option<Vec<FsBlock>>>,
     sender: SyncSender<Option<BlockExtra>>,
     height: u32,
     next: BlockHash,
@@ -87,7 +87,7 @@ impl Reorder {
     pub fn new(
         network: Network,
         max_reorg: u8,
-        receiver: Receiver<Option<FsBlock>>,
+        receiver: Receiver<Option<Vec<FsBlock>>>,
         sender: SyncSender<Option<BlockExtra>>,
     ) -> Reorder {
         Reorder {
@@ -119,34 +119,35 @@ impl Reorder {
             let received = self.receiver.recv().expect("cannot receive blob");
             now = Instant::now();
             match received {
-                Some(raw_block) => {
-                    log!(
-                        periodic_log_level(count),
-                        "reorder receive:{} size:{} follows:{} height:{} next:{}",
-                        raw_block.hash,
-                        self.blocks.blocks.len(),
-                        self.blocks.follows.len(),
-                        self.height,
-                        self.next
-                    );
+                Some(raw_blocks) => {
+                    for raw_block in raw_blocks {
+                        log!(
+                            periodic_log_level(count),
+                            "reorder receive:{} size:{} follows:{} next:{}",
+                            raw_block.hash,
+                            self.blocks.blocks.len(),
+                            self.blocks.follows.len(),
+                            self.next
+                        );
 
-                    count += 1;
+                        count += 1;
 
-                    if self.blocks.blocks.len() > 10_000 {
-                        for block in self.blocks.blocks.values() {
-                            println!("{} {:?}", block.hash, block.next);
+                        if self.blocks.blocks.len() > 10_000 {
+                            for block in self.blocks.blocks.values() {
+                                println!("{} {:?}", block.hash, block.next);
+                            }
+                            println!("next: {}", self.next);
+                            panic!();
                         }
-                        println!("next: {}", self.next);
-                        panic!();
-                    }
-                    self.blocks.add(raw_block);
-                    while let Some(block_to_send) = self.blocks.remove(&self.next) {
-                        let block_extra: BlockExtra =
-                            block_to_send.try_into().expect("should find the file");
-                        busy_time += now.elapsed().as_nanos();
-                        self.send(block_extra);
-                        now = Instant::now();
-                        last_height = self.height;
+                        self.blocks.add(raw_block);
+                        while let Some(block_to_send) = self.blocks.remove(&self.next) {
+                            let block_extra: BlockExtra =
+                                block_to_send.try_into().expect("should find the file");
+                            busy_time += now.elapsed().as_nanos();
+                            self.send(block_extra);
+                            now = Instant::now();
+                            last_height = self.height;
+                        }
                     }
                 }
                 None => break,

@@ -15,7 +15,7 @@ pub struct ReadDetect {
     blocks_dir: PathBuf,
     seen: Seen,
     network: Network,
-    sender: SyncSender<Option<FsBlock>>,
+    sender: SyncSender<Option<Vec<FsBlock>>>,
 }
 
 /// Save half memory in comparison to using directly HashSet<BlockHash> while providing enough
@@ -35,7 +35,11 @@ impl Seen {
 }
 
 impl ReadDetect {
-    pub fn new(blocks_dir: PathBuf, network: Network, sender: SyncSender<Option<FsBlock>>) -> Self {
+    pub fn new(
+        blocks_dir: PathBuf,
+        network: Network,
+        sender: SyncSender<Option<Vec<FsBlock>>>,
+    ) -> Self {
         ReadDetect {
             blocks_dir,
             sender,
@@ -62,6 +66,12 @@ impl ReadDetect {
 
         for path in paths {
             content.clear();
+
+            // instead of sending FsBlock on the channel directly, we quickly insert in the vector
+            // allowing to read ahead exactly one file (reading no block ahead cause non-parallelizing
+            // reading more than 1 file ahead cause cache to work not efficiently)
+            let mut fs_blocks = Vec::with_capacity(128);
+
             let mut file = File::open(&path).unwrap();
             file.read_to_end(&mut content).unwrap();
             info!("read {} of {:?}", content.len(), &path);
@@ -97,10 +107,7 @@ impl ReadDetect {
                                 prev: header.prev_blockhash,
                                 next: vec![],
                             };
-
-                            busy_time += now.elapsed().as_nanos();
-                            self.sender.send(Some(fs_block)).expect("cannot send");
-                            now = Instant::now();
+                            fs_blocks.push(fs_block);
                         } else {
                             warn!("duplicate block {}", hash);
                         }
@@ -108,6 +115,10 @@ impl ReadDetect {
                     Err(e) => error!("error header parsing {:?}", e),
                 }
             }
+
+            busy_time += now.elapsed().as_nanos();
+            self.sender.send(Some(fs_blocks)).expect("cannot send");
+            now = Instant::now();
         }
         self.sender.send(None).expect("cannot send");
         info!(
