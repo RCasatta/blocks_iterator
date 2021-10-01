@@ -47,10 +47,11 @@ impl Parse {
     }
 
     pub fn start(&mut self) {
+        let mut now = Instant::now();
         let mut total_blocks = 0usize;
         let mut blocks_in_file = 0usize;
-        let mut now = Instant::now();
         let mut busy_time = 0u128;
+        let mut max_block_per_file = 0;
         loop {
             busy_time += now.elapsed().as_nanos();
             let received = self.receiver.recv().expect("cannot receive blob");
@@ -60,6 +61,7 @@ impl Parse {
                     let mut cursor = Cursor::new(&content);
                     let max_pos = content.len() as u64;
                     while cursor.position() < max_pos {
+                        // TODO? rolling_u32 updating itself with u8?
                         match u32::consensus_decode(&mut cursor) {
                             Ok(value) => {
                                 if self.network.magic() != value {
@@ -78,9 +80,10 @@ impl Parse {
                             .expect("failed to seek forward");
                         let end = cursor.position() as usize;
 
+                        // We optimistically detect only the header to save time, we expect it will
+                        // be followed by a valid block
                         match BlockHeader::consensus_decode(&content[start..]) {
                             Ok(header) => {
-                                blocks_in_file += 1;
                                 let hash = header.block_hash();
                                 let fs_block = FsBlock {
                                     start,
@@ -91,6 +94,7 @@ impl Parse {
                                     next: vec![],
                                 };
                                 if !self.seen.contains(&hash) {
+                                    blocks_in_file += 1;
                                     self.seen.insert(&hash);
                                     busy_time += now.elapsed().as_nanos();
                                     self.sender.send(Some(fs_block)).unwrap();
@@ -103,11 +107,13 @@ impl Parse {
                         }
                     }
 
+                    max_block_per_file = max_block_per_file.max(blocks_in_file);
                     total_blocks += blocks_in_file;
                     debug!(
                         "This blob contain {} blocks (total {})",
                         blocks_in_file, total_blocks
                     );
+                    blocks_in_file = 0;
                 }
                 None => break,
             }
@@ -115,6 +121,6 @@ impl Parse {
 
         busy_time += now.elapsed().as_nanos();
         self.sender.send(None).unwrap();
-        info!("ending parser, busy time: {}s", (busy_time / 1_000_000_000));
+        info!("ending parser, max_block_per_file:{} busy time: {}s",max_block_per_file, (busy_time / 1_000_000_000));
     }
 }
