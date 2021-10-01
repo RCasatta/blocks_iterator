@@ -27,6 +27,7 @@ use std::time::Instant;
 use structopt::StructOpt;
 
 mod fee;
+mod parse;
 mod read_detect;
 mod reorder;
 mod truncmap;
@@ -166,12 +167,6 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
 
         let (send_ordered_blocks, receive_ordered_blocks) =
             sync_channel(config.channels_size.into());
-        let send_ordered_blocks = if config.skip_prevout {
-            // if skip_prevout is true, we send directly to end step
-            channel.clone()
-        } else {
-            send_ordered_blocks
-        };
         let mut reorder = reorder::Reorder::new(
             config.network,
             config.max_reorg,
@@ -182,14 +177,27 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
             reorder.start();
         });
 
+        let (send_parsed_blocks, receive_parsed_blocks) = sync_channel(config.channels_size.into());
+        let send_parsed_blocks = if config.skip_prevout {
+            // if skip_prevout is true, we send directly to end step
+            channel.clone()
+        } else {
+            send_parsed_blocks
+        };
+        let mut parse = parse::Parse::new(receive_ordered_blocks, send_parsed_blocks);
+        let parse_handle = thread::spawn(move || {
+            parse.start();
+        });
+
         if !config.skip_prevout {
-            let mut fee = fee::Fee::new(receive_ordered_blocks, channel);
+            let mut fee = fee::Fee::new(receive_parsed_blocks, channel);
             let fee_handle = thread::spawn(move || {
                 fee.start();
             });
             fee_handle.join().unwrap();
         }
 
+        parse_handle.join().unwrap();
         read_handle.join().unwrap();
         orderer_handle.join().unwrap();
         info!("Total time elapsed: {}s", now.elapsed().as_secs());

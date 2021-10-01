@@ -1,17 +1,15 @@
-use crate::{periodic_log_level, BlockExtra, FsBlock};
+use crate::{periodic_log_level, FsBlock};
 use bitcoin::blockdata::constants::genesis_block;
 use bitcoin::{BlockHash, Network};
 use log::{info, log, warn};
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::time::Instant;
 
 pub struct Reorder {
     receiver: Receiver<Option<FsBlock>>,
-    sender: SyncSender<Option<BlockExtra>>,
-    height: u32,
+    sender: SyncSender<Option<FsBlock>>,
     next: BlockHash,
     blocks: OutOfOrderBlocks,
 }
@@ -88,33 +86,27 @@ impl Reorder {
         network: Network,
         max_reorg: u8,
         receiver: Receiver<Option<FsBlock>>,
-        sender: SyncSender<Option<BlockExtra>>,
+        sender: SyncSender<Option<FsBlock>>,
     ) -> Reorder {
         Reorder {
             sender,
             receiver,
-            height: 0,
             next: genesis_block(network).block_hash(),
             blocks: OutOfOrderBlocks::new(max_reorg),
         }
     }
 
-    fn send(&mut self, mut block_extra: BlockExtra) {
-        self.next = block_extra.next[0];
-        block_extra.height = self.height;
-        self.blocks.follows.remove(&block_extra.block_hash);
-        self.blocks
-            .blocks
-            .remove(&block_extra.block.header.prev_blockhash);
-        self.sender.send(Some(block_extra)).unwrap();
-        self.height += 1;
+    fn send(&mut self, fs_block: FsBlock) {
+        self.next = fs_block.next[0];
+        self.blocks.follows.remove(&fs_block.hash);
+        self.blocks.blocks.remove(&fs_block.prev);
+        self.sender.send(Some(fs_block)).unwrap();
     }
 
     pub fn start(&mut self) {
         let mut busy_time = 0u128;
         let mut count = 0u32;
         let mut now;
-        let mut last_height = 0;
         loop {
             let received = self.receiver.recv().expect("cannot receive blob");
             now = Instant::now();
@@ -122,11 +114,10 @@ impl Reorder {
                 Some(raw_block) => {
                     log!(
                         periodic_log_level(count),
-                        "reorder receive:{} size:{} follows:{} height:{} next:{}",
+                        "reorder receive:{} size:{} follows:{} next:{}",
                         raw_block.hash,
                         self.blocks.blocks.len(),
                         self.blocks.follows.len(),
-                        self.height,
                         self.next
                     );
 
@@ -140,13 +131,10 @@ impl Reorder {
                         panic!();
                     }
                     self.blocks.add(raw_block);
-                    while let Some(block_to_send) = self.blocks.remove(&self.next) {
-                        let block_extra: BlockExtra =
-                            block_to_send.try_into().expect("should find the file");
+                    while let Some(fs_block) = self.blocks.remove(&self.next) {
                         busy_time += now.elapsed().as_nanos();
-                        self.send(block_extra);
+                        self.send(fs_block);
                         now = Instant::now();
-                        last_height = self.height;
                     }
                 }
                 None => break,
@@ -159,11 +147,7 @@ impl Reorder {
             self.blocks.blocks.len(),
             self.blocks.follows.len()
         );
-        info!(
-            "ending reorder, busy time: {}s, last height: {}",
-            busy_time / 1_000_000_000,
-            last_height
-        );
+        info!("ending reorder, busy time: {}s", busy_time / 1_000_000_000);
         self.sender.send(None).expect("reorder cannot send none");
     }
 }
