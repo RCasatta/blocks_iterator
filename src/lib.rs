@@ -19,6 +19,7 @@ use bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut};
 use log::{info, Level};
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::ops::DerefMut;
 use std::path::PathBuf;
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::thread;
@@ -40,6 +41,7 @@ pub use glob;
 pub use log;
 use std::fs::File;
 use std::io::{BufReader, Seek, SeekFrom};
+use std::sync::{Arc, Mutex};
 pub use structopt;
 
 /// Configuration parameters, most important the bitcoin blocks directory
@@ -95,7 +97,7 @@ pub struct BlockExtra {
 /// memory in the [`OutOfOrderBlocks`] map.
 #[derive(Debug)]
 pub struct FsBlock {
-    pub path: PathBuf,
+    pub file: Arc<Mutex<File>>,
     pub start: usize,
     pub end: usize,
     pub hash: BlockHash,
@@ -106,17 +108,17 @@ pub struct FsBlock {
 impl TryFrom<FsBlock> for BlockExtra {
     type Error = ();
 
-    fn try_from(raw_block: FsBlock) -> Result<Self, Self::Error> {
-        let mut block_file = File::open(raw_block.path).map_err(|_| ())?;
-        block_file
-            .seek(SeekFrom::Start(raw_block.start as u64))
+    fn try_from(fs_block: FsBlock) -> Result<Self, Self::Error> {
+        let mut guard = fs_block.file.lock().unwrap();
+        let file = guard.deref_mut();
+        file.seek(SeekFrom::Start(fs_block.start as u64))
             .map_err(|_| ())?;
-        let reader = BufReader::new(block_file);
+        let reader = BufReader::new(file);
         Ok(BlockExtra {
             block: Block::consensus_decode(reader).map_err(|_| ())?,
-            block_hash: raw_block.hash,
-            size: (raw_block.end - raw_block.start) as u32,
-            next: raw_block.next,
+            block_hash: fs_block.hash,
+            size: (fs_block.end - fs_block.start) as u32,
+            next: fs_block.next,
             height: 0,
             outpoint_values: Default::default(),
         })
