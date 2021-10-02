@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 pub struct ReadDetect {
@@ -74,7 +75,8 @@ impl ReadDetect {
 
             let mut file = File::open(&path).unwrap();
             file.read_to_end(&mut content).unwrap();
-            info!("read {} of {:?}", content.len(), &path);
+            let file = Arc::new(Mutex::new(file));
+
             let mut cursor = Cursor::new(&content);
             while cursor.position() < content.len() as u64 {
                 match u32::consensus_decode(&mut cursor) {
@@ -102,7 +104,7 @@ impl ReadDetect {
                             let fs_block = FsBlock {
                                 start,
                                 end: cursor.position() as usize,
-                                path: path.clone(),
+                                file: Arc::clone(&file),
                                 hash,
                                 prev: header.prev_blockhash,
                                 next: vec![],
@@ -115,7 +117,12 @@ impl ReadDetect {
                     Err(e) => error!("error header parsing {:?}", e),
                 }
             }
-
+            info!(
+                "read {} bytes of {:?}, contains {} blocks",
+                content.len(),
+                &path,
+                fs_blocks.len()
+            );
             busy_time += now.elapsed().as_nanos();
             self.sender.send(Some(fs_blocks)).expect("cannot send");
             now = Instant::now();
