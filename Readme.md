@@ -11,14 +11,14 @@ Features:
 
 ## Memory requirements and performance
 
-Running [iterate](examples/iterate.rs) example on threadripper 1950X, Testnet @ 1970k, Mainnet @ 681k
+Running [iterate](examples/iterate.rs) example on threadripper 1950X, Testnet @ 2090k, Mainnet @ 709k. Spinning disk.
 
-| Network | `--skip--prevout` | Memory | Time   |
-|---------|-------------------|-------:|-------:|
-| Mainnet | false             | 10.3GB | 1h:00m |
-| Mainnet | true              |  2.7GB |    36m |
-| Testnet | false             |  3.2GB |     5m |
-| Testnet | true              |  1.0GB |     3m |
+| Network | `--skip--prevout` | `--max-reorg` | Memory | Time   |
+|---------|-------------------|---------------|-------:|-------:|
+| Mainnet | false             |            6  |  8.3GB | 1h:15m |
+| Mainnet | true              |            6  |  157MB | 1h:00m |
+| Testnet | false             |           40  |  2.4GB | 5m:12s |
+| Testnet | true              |           40  |  221MB | 5m:12s |
 
 ## Examples
 

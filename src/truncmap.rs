@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::hash::{BuildHasher, Hasher};
 
 /// A map like struct storing truncated keys to save memory, in case of collisions a fallback map
-/// with the full key is used. This is only possible because we know OutPoint are unique.
+/// with the full key is used. This is only possible because we know OutPoints are unique.
 /// It obviously loose the ability to iterate over keys
 pub struct TruncMap {
     /// use a PassthroughHasher since the key it's already an hash
@@ -38,7 +38,6 @@ impl StackScript {
 
 impl From<&Script> for StackScript {
     fn from(script: &Script) -> Self {
-        //TODO populate with right hash values
         if script.is_p2pkh() {
             StackScript::P2Pkh(PubkeyHash::from_slice(&script[3..23]).unwrap())
         } else if script.is_p2sh() {
@@ -64,8 +63,6 @@ impl From<StackScript> for Script {
 
 impl TruncMap {
     /// insert a value in the map
-    /// value is Cow<>, because in the more common case if I would accept TxOut but the caller has &TxOut 2 clones in total would be necessary (1 from the caller and 1 inside) while with the Cow only 1 is needed
-    /// when accepting &TxOut but the caller has TxOut, we internally need 1 clone in both cases
     pub fn insert(&mut self, outpoint: OutPoint, tx_out: &TxOut) {
         let tx_out_stack: (StackScript, u64) = ((&tx_out.script_pubkey).into(), tx_out.value);
         if tx_out_stack.0.is_other() {
@@ -158,6 +155,7 @@ impl Hasher for PassthroughHasher {
 #[cfg(test)]
 mod test {
     use crate::truncmap::StackScript;
+    use crate::FsBlock;
     use bitcoin::hashes::Hash;
     use bitcoin::{PubkeyHash, PublicKey, Script, ScriptHash, WPubkeyHash, WScriptHash};
 
@@ -171,6 +169,7 @@ mod test {
         assert_eq!(std::mem::size_of::<WScriptHash>(), 32);
         assert_eq!(std::mem::size_of::<Box<[u8]>>(), 16);
         assert_eq!(std::mem::size_of::<(StackScript, u64)>(), 32);
+        assert_eq!(std::mem::size_of::<FsBlock>(), 112);
     }
 
     #[test]

@@ -62,7 +62,8 @@ impl ReadDetect {
         info!("There are {} block files", paths.len());
         let mut busy_time = 0u128;
 
-        // https://github.com/bitcoin/bitcoin/search?q=MAX_BLOCKFILE_SIZE
+        // Data struct to be reused to read the content of .dat files. We know the max size is 128MiB
+        // from https://github.com/bitcoin/bitcoin/search?q=MAX_BLOCKFILE_SIZE
         let mut content = Vec::with_capacity(0x8000000);
 
         for path in paths {
@@ -127,10 +128,10 @@ impl ReadDetect {
             self.sender.send(Some(fs_blocks)).expect("cannot send");
             now = Instant::now();
         }
-        self.sender.send(None).expect("cannot send");
         info!(
             "ending reader parse , busy time: {}s",
             (busy_time / 1_000_000_000)
         );
+        self.sender.send(None).expect("cannot send");
     }
 }

@@ -113,9 +113,10 @@ impl Reorder {
     pub fn start(&mut self) {
         let mut busy_time = 0u128;
         let mut count = 0u32;
-        let mut now;
+        let mut now = Instant::now();
         let mut last_height = 0;
         loop {
+            busy_time += now.elapsed().as_nanos();
             let received = self.receiver.recv().expect("cannot receive blob");
             now = Instant::now();
             match received {
@@ -132,12 +133,15 @@ impl Reorder {
 
                         count += 1;
 
-                        if self.blocks.blocks.len() > 10_000 {
+                        // even tough should be 1024 -> https://github.com/bitcoin/bitcoin/search?q=BLOCK_DOWNLOAD_WINDOW
+                        // in practice it needs to be greater
+                        let max_block_to_reorder = 10_000;
+                        if self.blocks.blocks.len() > max_block_to_reorder {
                             for block in self.blocks.blocks.values() {
                                 println!("{} {:?}", block.hash, block.next);
                             }
                             println!("next: {}", self.next);
-                            panic!();
+                            panic!("Reorder map grow more than {}", max_block_to_reorder);
                         }
                         self.blocks.add(raw_block);
                         while let Some(block_to_send) = self.blocks.remove(&self.next) {
@@ -152,7 +156,6 @@ impl Reorder {
                 }
                 None => break,
             }
-            busy_time += now.elapsed().as_nanos();
         }
         info!(
             "ending reorder next:{} #elements:{} #follows:{}",

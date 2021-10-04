@@ -56,12 +56,14 @@ impl Fee {
 
     pub fn start(&mut self) {
         info!("starting fee processer");
+        let mut now = Instant::now();
         let mut busy_time = 0u128;
         let mut total_txs = 0u64;
         let mut last_height = 0;
         loop {
+            busy_time += now.elapsed().as_nanos();
             let received = self.receiver.recv().unwrap();
-            let now = Instant::now();
+            now = Instant::now();
             match received {
                 Some(mut block_extra) => {
                     last_height = block_extra.height;
@@ -115,19 +117,18 @@ impl Fee {
 
                     busy_time += now.elapsed().as_nanos();
                     self.sender.send(Some(block_extra)).unwrap();
+                    now = Instant::now();
                 }
                 None => break,
             }
         }
-
-        self.sender.send(None).expect("fee: cannot send none");
-
         info!(
             "ending fee processer total tx {}, busy time: {}s, last height: {}",
             total_txs,
             busy_time / 1_000_000_000,
             last_height
         );
+        self.sender.send(None).expect("fee: cannot send none");
     }
 }
 
