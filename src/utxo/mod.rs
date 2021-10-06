@@ -16,9 +16,7 @@ pub trait Utxo {
     fn add(&mut self, block: &Block, height: u32);
 
     /// Remove and return an outpoint from the Utxo
-    ///
-    /// Some implementation (db) may decide to not physically remove the outpoint internally
-    fn remove(&mut self, outpoint: &OutPoint) -> TxOut;
+    fn remove(&mut self, outpoint: &OutPoint) -> TxOut;  // TODO remove and refactor MemUtxo
 
     /// Get all the prevouts in the block at `height` in reverse order they are found in the block.
     /// last element in the vector is the prevout of the first input of the first transaction after

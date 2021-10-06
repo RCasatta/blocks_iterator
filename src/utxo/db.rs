@@ -3,7 +3,8 @@ use crate::bitcoin::{Block, OutPoint, TxOut};
 use crate::utxo::Utxo;
 use bitcoin::consensus::deserialize;
 use log::debug;
-use rocksdb::DB;
+use rocksdb::{WriteBatch, DB};
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::path::Path;
 
@@ -36,37 +37,53 @@ impl Utxo for DbUtxo {
             height, self.updated_up_to_height
         );
         if height >= self.updated_up_to_height {
-            let mut txids = Vec::with_capacity(block.txdata.len());
-            let mut prevouts = Vec::with_capacity(block.txdata.iter().map(|e| e.input.len()).sum());
+            // since we can spend outputs created in this same block, we first put outputs in memory...
+            let total_outputs = block.txdata.iter().map(|e| e.output.len()).sum();
+            let mut current_outputs = HashMap::with_capacity(total_outputs);
             for tx in block.txdata.iter() {
                 let txid = tx.txid();
                 for (i, output) in tx.output.iter().enumerate() {
                     let outpoint = OutPoint::new(txid, i as u32);
-                    self.db
-                        .put(serialize(&outpoint), serialize(output))
-                        .unwrap(); //TODO use batch, remove unwrap
+                    current_outputs.insert(outpoint, output);
                 }
-                txids.push(txid);
+            }
 
-                if !tx.is_coin_base() {
-                    for input in tx.input.iter() {
-                        let tx_out = self.remove(&input.previous_output);
-                        prevouts.push(tx_out);
+            let total_inputs = block.txdata.iter().map(|e| e.input.len()).sum();
+            let mut prevouts = Vec::with_capacity(total_inputs);
+            let mut batch = WriteBatch::default();
+            for tx in block.txdata.iter().skip(1) {
+                for input in tx.input.iter() {
+                    //...then we first check if inputs spend output created in this block
+                    match current_outputs.remove(&input.previous_output) {
+                        Some(tx_out) => {
+                            // we avoid touching the db entirely if it's spent in the same block
+                            prevouts.push(tx_out.clone())
+                        }
+                        None => {
+                            let key = serialize(&input.previous_output);
+                            let tx_out = deserialize(&self.db.get(&key).unwrap().unwrap()).unwrap();
+                            batch.delete(&key);
+                            prevouts.push(tx_out);
+                        }
                     }
                 }
             }
+
+            // and we put all the remaining outputs in db
+            for (k, v) in current_outputs.drain() {
+                batch.put(serialize(&k), serialize(v));
+            }
             prevouts.reverse();
-            self.db
-                .put(height.to_be_bytes(), serialize(&prevouts))
-                .unwrap();
-            self.db
-                .put("updated_up_to_height", height.to_be_bytes())
-                .unwrap();
+            batch.put(height.to_be_bytes(), serialize(&prevouts));
+            batch.put("updated_up_to_height", height.to_be_bytes());
+            self.db.write(batch).unwrap(); // TODO unwrap
         }
     }
 
-    fn remove(&mut self, outpoint: &OutPoint) -> TxOut {
-        deserialize(&self.db.get(serialize(&outpoint)).unwrap().unwrap()).unwrap()
+    fn remove(&mut self, _outpoint: &OutPoint) -> TxOut {
+        unimplemented!(
+            "In db impl we are not using this method because add is doing remove with batch"
+        )
     }
 
     fn get_all(&self, height: u32) -> Option<Vec<TxOut>> {
@@ -77,7 +94,7 @@ impl Utxo for DbUtxo {
     }
 
     fn stat(&self) -> String {
-        "".to_string()
+        format!("updated_up_to_height: {}", self.updated_up_to_height)
     }
 }
 
