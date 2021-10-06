@@ -42,17 +42,9 @@ impl<T: Utxo> Fee<T> {
                     total_txs += block_extra.block.txdata.len() as u64;
 
                     if block_extra.height % 10_000 == 0 {
-                        info!("{:?}", self.utxo.stat());
-                        /* TODO
-                        let (utxo_size, collision_size, utxo_capacity) = self.utxo.map.len();
-                        info!(
-                            "(utxo, collision, capacity): {:?} load:{:.1}% script on stack: {:.1}% unspendable:{}",
-                            (utxo_size, collision_size, utxo_capacity),
-                            (utxo_size as f64 / utxo_capacity as f64) * 100.0,
-                            self.utxo.map.script_on_stack() * 100.0,
-                            self.utxo.unspendable,
-                        );*/
+                        info!("{}", self.utxo.stat());
                     }
+
                     for tx in block_extra.block.txdata.iter() {
                         self.utxo.add(tx);
                     }

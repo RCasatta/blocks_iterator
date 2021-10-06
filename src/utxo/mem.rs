@@ -1,5 +1,5 @@
 use crate::bitcoin::{Transaction, Txid};
-use crate::utxo::{Stat, Utxo};
+use crate::utxo::Utxo;
 use bitcoin::hashes::Hash;
 use bitcoin::{OutPoint, PubkeyHash, Script, ScriptHash, TxOut, WPubkeyHash};
 use fxhash::FxHashMap;
@@ -37,8 +37,23 @@ impl Utxo for MemUtxo {
         self.map.remove(&outpoint).unwrap()
     }
 
-    fn stat(&self) -> Stat {
-        Stat {}
+    fn stat(&self) -> String {
+        let utxo_size = self.map.trunc.len();
+        let collision_size = self.map.full.len();
+        let utxo_capacity = self.map.trunc.capacity();
+        let script_on_stack = (self.map.script_stack as f64
+            / ((self.map.script_other + self.map.script_stack) as f64))
+            * 100.0;
+        let unspendable = self.unspendable;
+        let load = (utxo_size as f64 / utxo_capacity as f64) * 100.0;
+
+        format!(
+            "(utxo, collision, capacity): {:?} load:{:.1}% script on stack: {:.1}% unspendable:{}",
+            (utxo_size, collision_size, utxo_capacity),
+            load,
+            script_on_stack,
+            unspendable
+        )
     }
 }
 
@@ -130,17 +145,6 @@ impl TruncMap {
             })
         }
     }
-
-    /*
-    TODO
-    pub fn len(&self) -> (usize, usize, usize) {
-        (self.trunc.len(), self.full.len(), self.trunc.capacity())
-    }
-
-    pub fn script_on_stack(&self) -> f64 {
-        self.script_stack as f64 / ((self.script_other + self.script_stack) as f64)
-    }
-    */
 
     fn hash(&self, outpoint: &OutPoint) -> u64 {
         let mut hasher = self.build_hasher.build_hasher();
