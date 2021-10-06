@@ -1,4 +1,4 @@
-use crate::bitcoin::{Block, OutPoint, TxOut, Txid};
+use crate::bitcoin::{Block, OutPoint, TxOut};
 
 mod mem;
 
@@ -13,14 +13,16 @@ pub use db::DbUtxo;
 pub trait Utxo {
     /// Add all the outputs of all the transaction in the block in the Utxo set
     /// returns the Txid of each transaction in the order they are found in the block
-    fn add(&mut self, block: &Block, height: u32) -> Vec<Txid>;
+    fn add(&mut self, block: &Block, height: u32);
 
     /// Remove and return an outpoint from the Utxo
     ///
     /// Some implementation (db) may decide to not physically remove the outpoint internally
     fn remove(&mut self, outpoint: &OutPoint) -> TxOut;
 
-    /// Get all the prevouts in the block at `height` in the order they are found in the block.
+    /// Get all the prevouts in the block at `height` in reverse order they are found in the block.
+    /// last element in the vector is the prevout of the first input of the first transaction after
+    /// the coinbase
     ///
     /// Some implementation (memory) may return `None` and require to repeatedly call remove
     fn get_all(&self, height: u32) -> Option<Vec<TxOut>>;
@@ -36,7 +38,7 @@ pub enum AnyUtxo {
 }
 
 impl Utxo for AnyUtxo {
-    fn add(&mut self, block: &Block, height: u32) -> Vec<Txid> {
+    fn add(&mut self, block: &Block, height: u32) {
         match self {
             #[cfg(feature = "db")]
             AnyUtxo::Db(db) => db.add(block, height),

@@ -35,12 +35,10 @@ impl MemUtxo {
 }
 
 impl Utxo for MemUtxo {
-    fn add(&mut self, block: &Block, _height: u32) -> Vec<Txid> {
-        let mut result = Vec::with_capacity(block.txdata.len());
+    fn add(&mut self, block: &Block, _height: u32) {
         for tx in block.txdata.iter() {
-            result.push(self.add_tx(tx));
+            self.add_tx(tx);
         }
-        result
     }
 
     fn remove(&mut self, outpoint: &OutPoint) -> TxOut {
