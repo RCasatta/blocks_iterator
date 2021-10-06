@@ -28,6 +28,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+      - uses: Swatinem/rust-cache@v1.2.0
+        with:
+          key: ${{ matrix.rust }}
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
@@ -45,11 +48,16 @@ jobs:
         example: [ "heaviest", "iterate", "most_output", "verify --features verify", "signatures_in_witness", "outputs_versions"]
     steps:
       - uses: actions/checkout@v2
+      - uses: Swatinem/rust-cache@v1.2.0
+        with:
+          key: ${{ matrix.example }}
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
       - uses: actions-rs/cargo@v1
+        env:
+          RUST_LOG: "debug"
         with:
           command: run
           args: --example ${{ matrix.example }} -- --blocks-dir blocks --network testnet
