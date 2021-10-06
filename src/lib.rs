@@ -12,20 +12,25 @@
 #![deny(unused_mut)]
 #![deny(dead_code)]
 #![deny(unused_imports)]
-//#![deny(missing_docs)]
+#![deny(missing_docs)]
 #![deny(unused_must_use)]
 
+use bitcoin::consensus::Decodable;
 use bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut};
 use log::{info, Level};
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::fs::File;
+use std::io::{BufReader, Seek, SeekFrom};
 use std::ops::DerefMut;
 use std::path::PathBuf;
 use std::sync::mpsc::{sync_channel, SyncSender};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Instant;
 use structopt::StructOpt;
+use utxo::AnyUtxo;
 
 mod fee;
 mod read_detect;
@@ -33,15 +38,10 @@ mod reorder;
 mod utxo;
 
 // re-exporting deps
-use crate::utxo::MemUtxo;
 pub use bitcoin;
-use bitcoin::consensus::Decodable;
 pub use fxhash;
 pub use glob;
 pub use log;
-use std::fs::File;
-use std::io::{BufReader, Seek, SeekFrom};
-use std::sync::{Arc, Mutex};
 pub use structopt;
 
 /// Configuration parameters, most important the bitcoin blocks directory
@@ -69,6 +69,26 @@ pub struct Config {
     /// Size of the channels used to pass messages between threads
     #[structopt(short, long, default_value = "0")]
     pub channels_size: u8,
+
+    #[cfg(feature = "db")]
+    /// Specify a directory where a database will be created to store the Utxo (when `--skip-prevout` is not used)
+    /// Reduce the memory requirements but it's slower and use disk space
+    #[structopt(short, long)]
+    pub utxo_db: Option<PathBuf>,
+}
+
+impl Config {
+    #[cfg(not(feature = "db"))]
+    fn utxo_manager(&self) -> AnyUtxo {
+        AnyUtxo::Mem(utxo::MemUtxo::new())
+    }
+    #[cfg(feature = "db")]
+    fn utxo_manager(&self) -> AnyUtxo {
+        match &self.utxo_db {
+            Some(path) => AnyUtxo::Db(utxo::DbUtxo::new(path).unwrap()), //TODO unwrap
+            None => AnyUtxo::Mem(utxo::MemUtxo::new()),
+        }
+    }
 }
 
 /// The bitcoin block and additional metadata returned by the [iterate] method
@@ -97,11 +117,27 @@ pub struct BlockExtra {
 /// memory in the [`OutOfOrderBlocks`] map.
 #[derive(Debug)]
 pub struct FsBlock {
+    /// the file the block identified by `hash` is stored in. Multiple blocks are stored in the
+    /// and we don't want to open/close the file many times for performance reasons so it's shared.
+    /// It's a Mutex to allow to be sent between threads but only one thread (reorder) mutably
+    /// access to it so there is no contention. (Arc alone isn't enough cause it can't be mutated,
+    /// RefCell can be mutated but not sent between threads)
     pub file: Arc<Mutex<File>>,
+
+    /// The start position in bytes in the `file` at which the block identified by `hash`
     pub start: usize,
+
+    /// The end position in bytes in the `file` at which the block identified by `hash`
     pub end: usize,
+
+    /// The hash identifying this block, output of `block.header.block_hash()`
     pub hash: BlockHash,
+
+    /// The hash of the block previous to this one, `block.header.prev_blockhash`
     pub prev: BlockHash,
+
+    /// The hash of the blocks following this one. It is populated during the reorder phase, it can
+    /// be more than one because of reorgs.
     pub next: Vec<BlockHash>,
 }
 
@@ -186,7 +222,7 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
         });
 
         if !config.skip_prevout {
-            let mut fee = fee::Fee::new(receive_ordered_blocks, channel, MemUtxo::new());
+            let mut fee = fee::Fee::new(receive_ordered_blocks, channel, config.utxo_manager());
             let fee_handle = thread::spawn(move || {
                 fee.start();
             });

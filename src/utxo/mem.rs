@@ -1,4 +1,4 @@
-use crate::bitcoin::{Transaction, Txid};
+use crate::bitcoin::{Block, Transaction, Txid};
 use crate::utxo::Utxo;
 use bitcoin::hashes::Hash;
 use bitcoin::{OutPoint, PubkeyHash, Script, ScriptHash, TxOut, WPubkeyHash};
@@ -20,8 +20,8 @@ impl MemUtxo {
     }
 }
 
-impl Utxo for MemUtxo {
-    fn add(&mut self, tx: &Transaction) -> Txid {
+impl MemUtxo {
+    fn add_tx(&mut self, tx: &Transaction) -> Txid {
         let txid = tx.txid();
         for (i, output) in tx.output.iter().enumerate() {
             if output.script_pubkey.is_provably_unspendable() {
@@ -32,9 +32,23 @@ impl Utxo for MemUtxo {
         }
         txid
     }
+}
 
-    fn remove(&mut self, outpoint: OutPoint) -> TxOut {
-        self.map.remove(&outpoint).unwrap()
+impl Utxo for MemUtxo {
+    fn add(&mut self, block: &Block, _height: u32) -> Vec<Txid> {
+        let mut result = Vec::with_capacity(block.txdata.len());
+        for tx in block.txdata.iter() {
+            result.push(self.add_tx(tx));
+        }
+        result
+    }
+
+    fn remove(&mut self, outpoint: &OutPoint) -> TxOut {
+        self.map.remove(outpoint).unwrap()
+    }
+
+    fn get_all(&self, _height: u32) -> Option<Vec<TxOut>> {
+        None
     }
 
     fn stat(&self) -> String {

@@ -45,13 +45,11 @@ impl<T: Utxo> Fee<T> {
                         info!("{}", self.utxo.stat());
                     }
 
-                    for tx in block_extra.block.txdata.iter() {
-                        self.utxo.add(tx);
-                    }
+                    self.utxo.add(&block_extra.block, block_extra.height);
 
                     for tx in block_extra.block.txdata.iter().skip(1) {
                         for input in tx.input.iter() {
-                            let previous_txout = self.utxo.remove(input.previous_output);
+                            let previous_txout = self.utxo.remove(&input.previous_output);
                             block_extra
                                 .outpoint_values
                                 .insert(input.previous_output, previous_txout);
