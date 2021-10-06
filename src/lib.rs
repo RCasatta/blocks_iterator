@@ -30,9 +30,10 @@ use structopt::StructOpt;
 mod fee;
 mod read_detect;
 mod reorder;
-mod truncmap;
+mod utxo;
 
 // re-exporting deps
+use crate::utxo::MemUtxo;
 pub use bitcoin;
 use bitcoin::consensus::Decodable;
 pub use fxhash;
@@ -185,7 +186,7 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
         });
 
         if !config.skip_prevout {
-            let mut fee = fee::Fee::new(receive_ordered_blocks, channel);
+            let mut fee = fee::Fee::new(receive_ordered_blocks, channel, MemUtxo::new());
             let fee_handle = thread::spawn(move || {
                 fee.start();
             });

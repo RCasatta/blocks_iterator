@@ -1,8 +1,46 @@
+use crate::bitcoin::{Transaction, Txid};
+use crate::utxo::{Stat, Utxo};
 use bitcoin::hashes::Hash;
 use bitcoin::{OutPoint, PubkeyHash, Script, ScriptHash, TxOut, WPubkeyHash};
 use fxhash::FxHashMap;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hasher};
+
+pub struct MemUtxo {
+    map: TruncMap,
+    unspendable: u64,
+}
+
+impl MemUtxo {
+    pub fn new() -> Self {
+        MemUtxo {
+            map: TruncMap::default(),
+            unspendable: 0,
+        }
+    }
+}
+
+impl Utxo for MemUtxo {
+    fn add(&mut self, tx: &Transaction) -> Txid {
+        let txid = tx.txid();
+        for (i, output) in tx.output.iter().enumerate() {
+            if output.script_pubkey.is_provably_unspendable() {
+                self.unspendable += 1;
+                continue;
+            }
+            self.map.insert(OutPoint::new(txid, i as u32), output);
+        }
+        txid
+    }
+
+    fn remove(&mut self, outpoint: OutPoint) -> TxOut {
+        self.map.remove(&outpoint).unwrap()
+    }
+
+    fn stat(&self) -> Stat {
+        Stat {}
+    }
+}
 
 /// A map like struct storing truncated keys to save memory, in case of collisions a fallback map
 /// with the full key is used. This is only possible because we know OutPoints are unique.
@@ -93,6 +131,8 @@ impl TruncMap {
         }
     }
 
+    /*
+    TODO
     pub fn len(&self) -> (usize, usize, usize) {
         (self.trunc.len(), self.full.len(), self.trunc.capacity())
     }
@@ -100,6 +140,7 @@ impl TruncMap {
     pub fn script_on_stack(&self) -> f64 {
         self.script_stack as f64 / ((self.script_other + self.script_stack) as f64)
     }
+    */
 
     fn hash(&self, outpoint: &OutPoint) -> u64 {
         let mut hasher = self.build_hasher.build_hasher();
@@ -154,7 +195,7 @@ impl Hasher for PassthroughHasher {
 
 #[cfg(test)]
 mod test {
-    use crate::truncmap::StackScript;
+    use crate::utxo::mem::StackScript;
     use crate::FsBlock;
     use bitcoin::hashes::Hash;
     use bitcoin::{PubkeyHash, PublicKey, Script, ScriptHash, WPubkeyHash, WScriptHash};

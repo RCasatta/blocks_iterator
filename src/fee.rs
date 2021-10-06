@@ -1,56 +1,27 @@
-use crate::truncmap::TruncMap;
+use crate::utxo::Utxo;
 use crate::BlockExtra;
-use bitcoin::{OutPoint, Script, Transaction, TxOut, Txid};
+use bitcoin::{OutPoint, Script, TxOut};
 use log::{debug, info, trace};
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::time::Instant;
 
-pub struct Fee {
+pub struct Fee<T: Utxo> {
     receiver: Receiver<Option<BlockExtra>>,
     sender: SyncSender<Option<BlockExtra>>,
-    utxo: Utxo,
+    utxo: T,
 }
 
-struct Utxo {
-    map: TruncMap,
-    unspendable: u64,
-}
-
-impl Utxo {
-    pub fn new() -> Self {
-        Utxo {
-            map: TruncMap::default(),
-            unspendable: 0,
-        }
-    }
-
-    pub fn add(&mut self, tx: &Transaction) -> Txid {
-        let txid = tx.txid();
-        for (i, output) in tx.output.iter().enumerate() {
-            if output.script_pubkey.is_provably_unspendable() {
-                self.unspendable += 1;
-                continue;
-            }
-            self.map.insert(OutPoint::new(txid, i as u32), output);
-        }
-        txid
-    }
-
-    pub fn remove(&mut self, outpoint: OutPoint) -> TxOut {
-        self.map.remove(&outpoint).unwrap()
-    }
-}
-
-impl Fee {
+impl<T: Utxo> Fee<T> {
     pub fn new(
         receiver: Receiver<Option<BlockExtra>>,
         sender: SyncSender<Option<BlockExtra>>,
-    ) -> Fee {
+        utxo: T,
+    ) -> Fee<T> {
         Fee {
             sender,
             receiver,
-            utxo: Utxo::new(),
+            utxo,
         }
     }
 
@@ -71,6 +42,8 @@ impl Fee {
                     total_txs += block_extra.block.txdata.len() as u64;
 
                     if block_extra.height % 10_000 == 0 {
+                        info!("{:?}", self.utxo.stat());
+                        /* TODO
                         let (utxo_size, collision_size, utxo_capacity) = self.utxo.map.len();
                         info!(
                             "(utxo, collision, capacity): {:?} load:{:.1}% script on stack: {:.1}% unspendable:{}",
@@ -78,7 +51,7 @@ impl Fee {
                             (utxo_size as f64 / utxo_capacity as f64) * 100.0,
                             self.utxo.map.script_on_stack() * 100.0,
                             self.utxo.unspendable,
-                        );
+                        );*/
                     }
                     for tx in block_extra.block.txdata.iter() {
                         self.utxo.add(tx);
