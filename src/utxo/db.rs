@@ -11,6 +11,7 @@ use std::path::Path;
 pub struct DbUtxo {
     db: DB,
     updated_up_to_height: i32,
+    inserted_outputs: u64,
 }
 
 impl DbUtxo {
@@ -25,6 +26,7 @@ impl DbUtxo {
         Ok(DbUtxo {
             db,
             updated_up_to_height,
+            inserted_outputs: 0,
         })
     }
 }
@@ -36,7 +38,7 @@ impl Utxo for DbUtxo {
             "height: {} updated_up_to: {}",
             height, self.updated_up_to_height
         );
-        if height >= self.updated_up_to_height {
+        if height > self.updated_up_to_height {
             // since we can spend outputs created in this same block, we first put outputs in memory...
             let total_outputs = block.txdata.iter().map(|e| e.output.len()).sum();
             let mut current_outputs = HashMap::with_capacity(total_outputs);
@@ -48,7 +50,7 @@ impl Utxo for DbUtxo {
                 }
             }
 
-            let total_inputs = block.txdata.iter().map(|e| e.input.len()).sum();
+            let total_inputs = block.txdata.iter().skip(1).map(|e| e.input.len()).sum();
             let mut prevouts = Vec::with_capacity(total_inputs);
             let mut batch = WriteBatch::default();
             for tx in block.txdata.iter().skip(1) {
@@ -64,6 +66,7 @@ impl Utxo for DbUtxo {
                             let tx_out = deserialize(&self.db.get(&key).unwrap().unwrap()).unwrap();
                             batch.delete(&key);
                             prevouts.push(tx_out);
+                            self.inserted_outputs += 1;
                         }
                     }
                 }
@@ -73,28 +76,25 @@ impl Utxo for DbUtxo {
             for (k, v) in current_outputs.drain() {
                 batch.put(serialize(&k), serialize(v));
             }
-            prevouts.reverse();
             batch.put(height.to_be_bytes(), serialize(&prevouts));
             batch.put("updated_up_to_height", height.to_be_bytes());
             self.db.write(batch).unwrap(); // TODO unwrap
         }
     }
 
-    fn remove(&mut self, _outpoint: &OutPoint) -> TxOut {
-        unimplemented!(
-            "In db impl we are not using this method because add is doing remove with batch"
-        )
-    }
-
-    fn get_all(&self, height: u32) -> Option<Vec<TxOut>> {
+    fn get(&mut self, height: u32) -> Vec<TxOut> {
         self.db
             .get(height.to_be_bytes())
             .unwrap()
             .map(|e| deserialize(&e).unwrap())
+            .unwrap()
     }
 
     fn stat(&self) -> String {
-        format!("updated_up_to_height: {}", self.updated_up_to_height)
+        format!(
+            "updated_up_to_height: {} inserted_outputs: {}",
+            self.updated_up_to_height, self.inserted_outputs
+        )
     }
 }
 

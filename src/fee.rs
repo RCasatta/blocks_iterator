@@ -46,14 +46,12 @@ impl<T: Utxo> Fee<T> {
                     }
 
                     self.utxo.add(&block_extra.block, block_extra.height);
-                    let mut prevouts = self.utxo.get_all(block_extra.height);
+                    let mut prevouts = self.utxo.get(block_extra.height);
+                    let mut prevouts = prevouts.drain(..);
 
                     for tx in block_extra.block.txdata.iter().skip(1) {
                         for input in tx.input.iter() {
-                            let previous_txout = match prevouts.as_mut() {
-                                Some(prevouts) => prevouts.pop().unwrap(), //TODO unwrap
-                                None => self.utxo.remove(&input.previous_output),
-                            };
+                            let previous_txout = prevouts.next().unwrap();
 
                             block_extra
                                 .outpoint_values

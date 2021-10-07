@@ -9,6 +9,7 @@ use std::hash::{BuildHasher, Hasher};
 pub struct MemUtxo {
     map: TruncMap,
     unspendable: u64,
+    block_prevouts: HashMap<u32, Vec<TxOut>>,
 }
 
 impl MemUtxo {
@@ -16,12 +17,13 @@ impl MemUtxo {
         MemUtxo {
             map: TruncMap::default(),
             unspendable: 0,
+            block_prevouts: HashMap::new(),
         }
     }
 }
 
 impl MemUtxo {
-    fn add_tx(&mut self, tx: &Transaction) -> Txid {
+    fn add_tx_outputs(&mut self, tx: &Transaction) -> Txid {
         let txid = tx.txid();
         for (i, output) in tx.output.iter().enumerate() {
             if output.script_pubkey.is_provably_unspendable() {
@@ -35,18 +37,23 @@ impl MemUtxo {
 }
 
 impl Utxo for MemUtxo {
-    fn add(&mut self, block: &Block, _height: u32) {
+    fn add(&mut self, block: &Block, height: u32) {
         for tx in block.txdata.iter() {
-            self.add_tx(tx);
+            self.add_tx_outputs(tx);
         }
+        let total_inputs = block.txdata.iter().skip(1).map(|e| e.input.len()).sum();
+        let mut prevouts = Vec::with_capacity(total_inputs);
+        for tx in block.txdata.iter().skip(1) {
+            for input in tx.input.iter() {
+                let tx_out = self.map.remove(&input.previous_output).unwrap();
+                prevouts.push(tx_out);
+            }
+        }
+        self.block_prevouts.insert(height, prevouts);
     }
 
-    fn remove(&mut self, outpoint: &OutPoint) -> TxOut {
-        self.map.remove(outpoint).unwrap()
-    }
-
-    fn get_all(&self, _height: u32) -> Option<Vec<TxOut>> {
-        None
+    fn get(&mut self, height: u32) -> Vec<TxOut> {
+        self.block_prevouts.remove(&height).unwrap()
     }
 
     fn stat(&self) -> String {
