@@ -1,5 +1,5 @@
 use crate::bitcoin::{Block, Transaction, Txid};
-use crate::utxo::Utxo;
+use crate::utxo::{Hash64, Utxo};
 use bitcoin::hashes::Hash;
 use bitcoin::{OutPoint, PubkeyHash, Script, ScriptHash, TxOut, WPubkeyHash};
 use fxhash::FxHashMap;
@@ -83,7 +83,6 @@ pub struct TruncMap {
     /// use a PassthroughHasher since the key it's already an hash
     trunc: HashMap<u64, (StackScript, u64), PassthroughHasher>,
     full: FxHashMap<OutPoint, TxOut>,
-    build_hasher: fxhash::FxBuildHasher,
     script_stack: u64,
     script_other: u64,
 }
@@ -144,11 +143,11 @@ impl TruncMap {
         }
 
         // we optimistically insert since collision must be rare
-        let old = self.trunc.insert(self.hash(&outpoint), tx_out_stack);
+        let old = self.trunc.insert(outpoint.hash64(), tx_out_stack);
 
         if let Some(old) = old {
             // rolling back since the element did exist
-            self.trunc.insert(self.hash(&outpoint), old);
+            self.trunc.insert(outpoint.hash64(), old);
             // since key collided, saving in the full map
             self.full.insert(outpoint, tx_out.clone());
         }
@@ -158,28 +157,22 @@ impl TruncMap {
         if let Some(val) = self.full.remove(outpoint) {
             Some(val)
         } else {
-            self.trunc.remove(&self.hash(outpoint)).map(|val| TxOut {
+            self.trunc.remove(&outpoint.hash64()).map(|val| TxOut {
                 script_pubkey: val.0.into(),
                 value: val.1,
             })
         }
     }
-
-    fn hash(&self, outpoint: &OutPoint) -> u64 {
-        let mut hasher = self.build_hasher.build_hasher();
-        std::hash::Hash::hash(outpoint, &mut hasher);
-        hasher.finish()
-    }
 }
 
 impl Default for TruncMap {
     fn default() -> Self {
+        // TODO for trunc map we should initialize with a capacity function of the network to avoid many re-allocation and re-hashing
         TruncMap {
             trunc: HashMap::<u64, (StackScript, u64), PassthroughHasher>::with_hasher(
                 PassthroughHasher::default(),
             ),
             full: FxHashMap::default(),
-            build_hasher: Default::default(),
             script_other: 0,
             script_stack: 0,
         }

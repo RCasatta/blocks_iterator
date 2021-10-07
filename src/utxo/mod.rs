@@ -7,6 +7,7 @@ mod db;
 
 pub use mem::MemUtxo;
 
+use bitcoin::OutPoint;
 #[cfg(feature = "db")]
 pub use db::DbUtxo;
 
@@ -21,6 +22,14 @@ pub trait Utxo {
 
     /// return stats about the Utxo
     fn stat(&self) -> String;
+}
+
+trait Hash64 {
+    fn hash64(&self) -> u64;
+}
+
+trait Hash32 {
+    fn hash32(&self) -> u32;
 }
 
 pub enum AnyUtxo {
@@ -52,5 +61,17 @@ impl Utxo for AnyUtxo {
             AnyUtxo::Db(db) => db.stat(),
             AnyUtxo::Mem(mem) => mem.stat(),
         }
+    }
+}
+
+impl Hash64 for OutPoint {
+    fn hash64(&self) -> u64 {
+        fxhash::hash64(self)
+    }
+}
+
+impl Hash32 for OutPoint {
+    fn hash32(&self) -> u32 {
+        fxhash::hash32(self)
     }
 }

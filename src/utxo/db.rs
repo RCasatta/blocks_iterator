@@ -1,6 +1,6 @@
 use crate::bitcoin::consensus::serialize;
 use crate::bitcoin::{Block, OutPoint, TxOut};
-use crate::utxo::Utxo;
+use crate::utxo::{Hash32, Hash64, Utxo};
 use bitcoin::consensus::deserialize;
 use log::debug;
 use rocksdb::{WriteBatch, DB};
@@ -20,7 +20,7 @@ impl DbUtxo {
         let updated_up_to_height = db
             .get("updated_up_to_height")?
             .map(|e| e.try_into().unwrap())
-            .map(|e| i32::from_be_bytes(e))
+            .map(|e| i32::from_ne_bytes(e))
             .unwrap_or(-1);
 
         Ok(DbUtxo {
@@ -62,7 +62,7 @@ impl Utxo for DbUtxo {
                             prevouts.push(tx_out.clone())
                         }
                         None => {
-                            let key = serialize(&input.previous_output);
+                            let key = input.previous_output.to_key();
                             let tx_out = deserialize(&self.db.get(&key).unwrap().unwrap()).unwrap();
                             batch.delete(&key);
                             prevouts.push(tx_out);
@@ -74,17 +74,17 @@ impl Utxo for DbUtxo {
 
             // and we put all the remaining outputs in db
             for (k, v) in current_outputs.drain() {
-                batch.put(serialize(&k), serialize(v));
+                batch.put(&k.to_key(), serialize(v));
             }
-            batch.put(height.to_be_bytes(), serialize(&prevouts));
-            batch.put("updated_up_to_height", height.to_be_bytes());
+            batch.put(height.to_ne_bytes(), serialize(&prevouts));
+            batch.put("updated_up_to_height", height.to_ne_bytes());
             self.db.write(batch).unwrap(); // TODO unwrap
         }
     }
 
     fn get(&mut self, height: u32) -> Vec<TxOut> {
         self.db
-            .get(height.to_be_bytes())
+            .get(height.to_ne_bytes())
             .unwrap()
             .map(|e| deserialize(&e).unwrap())
             .unwrap()
@@ -98,6 +98,21 @@ impl Utxo for DbUtxo {
     }
 }
 
+trait ToKey<T: AsRef<[u8]>> {
+    fn to_key(&self) -> T;
+}
+
+impl ToKey<[u8; 12]> for OutPoint {
+    fn to_key(&self) -> [u8; 12] {
+        let h64 = self.hash64().to_ne_bytes();
+        let h32 = self.hash32().to_ne_bytes();
+        let mut result = [0u8; 12];
+        result[..8].copy_from_slice(&h64);
+        result[8..].copy_from_slice(&h32);
+        result
+    }
+}
+
 #[cfg(test)]
 mod test {
     use rocksdb::DB;
@@ -107,7 +122,7 @@ mod test {
         let db = DB::open_default("rocks").unwrap();
 
         for i in 0i32..10_000_000 {
-            db.put(&format!("key{}", i), &i.to_be_bytes()).unwrap();
+            db.put(&format!("key{}", i), &i.to_ne_bytes()).unwrap();
         }
     }
 }
