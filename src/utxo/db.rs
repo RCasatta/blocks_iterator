@@ -3,7 +3,7 @@ use crate::bitcoin::{Block, OutPoint, TxOut};
 use crate::utxo::{Hash32, Hash64, Utxo};
 use bitcoin::consensus::deserialize;
 use log::debug;
-use rocksdb::{WriteBatch, DB};
+use rocksdb::{DBCompressionType, Options, WriteBatch, DB};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::path::Path;
@@ -16,7 +16,11 @@ pub struct DbUtxo {
 
 impl DbUtxo {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<DbUtxo, rocksdb::Error> {
-        let db = DB::open_default(path)?;
+        let mut options = Options::default();
+        options.set_compression_type(DBCompressionType::Snappy);
+        options.create_if_missing(true);
+        let db = DB::open(&options, path)?;
+
         let updated_up_to_height = db
             .get("updated_up_to_height")?
             .map(|e| e.try_into().unwrap())
