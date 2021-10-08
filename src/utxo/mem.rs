@@ -1,4 +1,4 @@
-use crate::bitcoin::{Block, Transaction, Txid};
+use crate::bitcoin::{Block, Network, Transaction, Txid};
 use crate::utxo::{Hash64, Utxo};
 use bitcoin::hashes::Hash;
 use bitcoin::{OutPoint, PubkeyHash, Script, ScriptHash, TxOut, WPubkeyHash};
@@ -13,9 +13,9 @@ pub struct MemUtxo {
 }
 
 impl MemUtxo {
-    pub fn new() -> Self {
+    pub fn new(network: Network) -> Self {
         MemUtxo {
-            map: TruncMap::default(),
+            map: TruncMap::new(network),
             unspendable: 0,
             block_prevouts: HashMap::new(),
         }
@@ -165,11 +165,20 @@ impl TruncMap {
     }
 }
 
-impl Default for TruncMap {
-    fn default() -> Self {
-        // TODO for trunc map we should initialize with a capacity function of the network to avoid many re-allocation and re-hashing
+impl TruncMap {
+    fn new(network: Network) -> Self {
+        // to avoid re-allocation and re-hashing of the map we use some known capacity needed
+        // at given height
+        let capacity = match network {
+            Network::Bitcoin => 98_959_418, // @704065 load:76.1%
+            Network::Testnet => 28_038_982, // @2097712 load:93.2%
+            Network::Signet => 1 >> 20,
+            Network::Regtest => 1 >> 10,
+        };
+
         TruncMap {
-            trunc: HashMap::<u64, (StackScript, u64), PassthroughHasher>::with_hasher(
+            trunc: HashMap::<u64, (StackScript, u64), PassthroughHasher>::with_capacity_and_hasher(
+                capacity,
                 PassthroughHasher::default(),
             ),
             full: FxHashMap::default(),

@@ -80,13 +80,13 @@ pub struct Config {
 impl Config {
     #[cfg(not(feature = "db"))]
     fn utxo_manager(&self) -> AnyUtxo {
-        AnyUtxo::Mem(utxo::MemUtxo::new())
+        AnyUtxo::Mem(utxo::MemUtxo::new(self.network))
     }
     #[cfg(feature = "db")]
     fn utxo_manager(&self) -> AnyUtxo {
         match &self.utxo_db {
             Some(path) => AnyUtxo::Db(utxo::DbUtxo::new(path).unwrap()), //TODO unwrap
-            None => AnyUtxo::Mem(utxo::MemUtxo::new()),
+            None => AnyUtxo::Mem(utxo::MemUtxo::new(self.network)),
         }
     }
 }
