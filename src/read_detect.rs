@@ -1,8 +1,8 @@
 use crate::bitcoin::consensus::Decodable;
 use crate::bitcoin::{BlockHash, Network};
-use crate::FsBlock;
+use crate::{periodic_log_level, FsBlock};
 use bitcoin::BlockHeader;
-use log::{error, info, warn};
+use log::{error, info, log, warn};
 use std::collections::HashSet;
 use std::convert::TryInto;
 use std::fs::File;
@@ -61,6 +61,7 @@ impl ReadDetect {
         paths.sort();
         info!("There are {} block files", paths.len());
         let mut busy_time = 0u128;
+        let mut count = 0u32;
 
         // Data struct to be reused to read the content of .dat files. We know the max size is 128MiB
         // from https://github.com/bitcoin/bitcoin/search?q=MAX_BLOCKFILE_SIZE
@@ -118,12 +119,15 @@ impl ReadDetect {
                     Err(e) => error!("error header parsing {:?}", e),
                 }
             }
-            info!(
+            log!(
+                periodic_log_level(count, 100),
                 "read {} bytes of {:?}, contains {} blocks",
                 content.len(),
                 &path,
                 fs_blocks.len()
             );
+            count += 1;
+
             busy_time += now.elapsed().as_nanos();
             self.sender.send(Some(fs_blocks)).expect("cannot send");
             now = Instant::now();

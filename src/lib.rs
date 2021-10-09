@@ -235,9 +235,9 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
     })
 }
 
-/// Utility method usually returning [log::Level::Debug] but when `i` is divisible by `10_000` returns [log::Level::Info]
-pub fn periodic_log_level(i: u32) -> Level {
-    if i % 10_000 == 0 {
+/// Utility method usually returning [log::Level::Debug] but when `i` is divisible by `every` returns [log::Level::Info]
+pub fn periodic_log_level(i: u32, every: u32) -> Level {
+    if i % every == 0 {
         Level::Info
     } else {
         Level::Debug

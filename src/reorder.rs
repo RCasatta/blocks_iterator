@@ -123,7 +123,7 @@ impl Reorder {
                 Some(raw_blocks) => {
                     for raw_block in raw_blocks {
                         log!(
-                            periodic_log_level(count),
+                            periodic_log_level(count, 10_000),
                             "reorder receive:{} size:{} follows:{} next:{}",
                             raw_block.hash,
                             self.blocks.blocks.len(),
