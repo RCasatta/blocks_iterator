@@ -1,6 +1,6 @@
 use crate::bitcoin::consensus::serialize;
 use crate::bitcoin::{Block, OutPoint, TxOut};
-use crate::utxo::{Hash32, Hash64, Utxo};
+use crate::utxo::{Hash32, Hash64, UtxoStore};
 use bitcoin::consensus::deserialize;
 use log::debug;
 use rocksdb::{DBCompressionType, Options, WriteBatch, DB};
@@ -35,8 +35,8 @@ impl DbUtxo {
     }
 }
 
-impl Utxo for DbUtxo {
-    fn add(&mut self, block: &Block, height: u32) {
+impl UtxoStore for DbUtxo {
+    fn add_outputs_get_inputs(&mut self, block: &Block, height: u32) -> Vec<TxOut> {
         let height = height as i32;
         debug!(
             "height: {} updated_up_to: {}",
@@ -45,12 +45,14 @@ impl Utxo for DbUtxo {
         if height > self.updated_up_to_height {
             // since we can spend outputs created in this same block, we first put outputs in memory...
             let total_outputs = block.txdata.iter().map(|e| e.output.len()).sum();
-            let mut current_outputs = HashMap::with_capacity(total_outputs);
+            let mut block_outputs = HashMap::with_capacity(total_outputs);
             for tx in block.txdata.iter() {
                 let txid = tx.txid();
                 for (i, output) in tx.output.iter().enumerate() {
-                    let outpoint = OutPoint::new(txid, i as u32);
-                    current_outputs.insert(outpoint, output);
+                    if !output.script_pubkey.is_provably_unspendable() {
+                        let outpoint = OutPoint::new(txid, i as u32);
+                        block_outputs.insert(outpoint, output);
+                    }
                 }
             }
 
@@ -60,7 +62,7 @@ impl Utxo for DbUtxo {
             for tx in block.txdata.iter().skip(1) {
                 for input in tx.input.iter() {
                     //...then we first check if inputs spend output created in this block
-                    match current_outputs.remove(&input.previous_output) {
+                    match block_outputs.remove(&input.previous_output) {
                         Some(tx_out) => {
                             // we avoid touching the db entirely if it's spent in the same block
                             prevouts.push(tx_out.clone())
@@ -70,23 +72,20 @@ impl Utxo for DbUtxo {
                             let tx_out = deserialize(&self.db.get(&key).unwrap().unwrap()).unwrap();
                             batch.delete(&key);
                             prevouts.push(tx_out);
-                            self.inserted_outputs += 1;
                         }
                     }
                 }
             }
 
             // and we put all the remaining outputs in db
-            for (k, v) in current_outputs.drain() {
+            for (k, v) in block_outputs.drain() {
                 batch.put(&k.to_key(), serialize(v));
+                self.inserted_outputs += 1;
             }
             batch.put(height.to_ne_bytes(), serialize(&prevouts));
             batch.put("updated_up_to_height", height.to_ne_bytes());
             self.db.write(batch).unwrap(); // TODO unwrap
         }
-    }
-
-    fn get(&mut self, height: u32) -> Vec<TxOut> {
         self.db
             .get(height.to_ne_bytes())
             .unwrap()

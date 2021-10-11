@@ -1,5 +1,5 @@
 use crate::bitcoin::{Block, Network, Transaction, Txid};
-use crate::utxo::{Hash64, Utxo};
+use crate::utxo::{Hash64, UtxoStore};
 use bitcoin::hashes::Hash;
 use bitcoin::{OutPoint, PubkeyHash, Script, ScriptHash, TxOut, WPubkeyHash};
 use fxhash::FxHashMap;
@@ -9,7 +9,6 @@ use std::hash::{BuildHasher, Hasher};
 pub struct MemUtxo {
     map: TruncMap,
     unspendable: u64,
-    block_prevouts: HashMap<u32, Vec<TxOut>>,
 }
 
 impl MemUtxo {
@@ -17,7 +16,6 @@ impl MemUtxo {
         MemUtxo {
             map: TruncMap::new(network),
             unspendable: 0,
-            block_prevouts: HashMap::new(),
         }
     }
 }
@@ -36,8 +34,8 @@ impl MemUtxo {
     }
 }
 
-impl Utxo for MemUtxo {
-    fn add(&mut self, block: &Block, height: u32) {
+impl UtxoStore for MemUtxo {
+    fn add_outputs_get_inputs(&mut self, block: &Block, _height: u32) -> Vec<TxOut> {
         for tx in block.txdata.iter() {
             self.add_tx_outputs(tx);
         }
@@ -49,11 +47,7 @@ impl Utxo for MemUtxo {
                 prevouts.push(tx_out);
             }
         }
-        self.block_prevouts.insert(height, prevouts);
-    }
-
-    fn get(&mut self, height: u32) -> Vec<TxOut> {
-        self.block_prevouts.remove(&height).unwrap()
+        prevouts
     }
 
     fn stat(&self) -> String {

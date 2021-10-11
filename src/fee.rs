@@ -1,4 +1,4 @@
-use crate::utxo::Utxo;
+use crate::utxo::UtxoStore;
 use crate::BlockExtra;
 use bitcoin::{OutPoint, Script, TxOut};
 use log::{debug, info, trace};
@@ -6,13 +6,13 @@ use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::time::Instant;
 
-pub struct Fee<T: Utxo> {
+pub struct Fee<T: UtxoStore> {
     receiver: Receiver<Option<BlockExtra>>,
     sender: SyncSender<Option<BlockExtra>>,
     utxo: T,
 }
 
-impl<T: Utxo> Fee<T> {
+impl<T: UtxoStore> Fee<T> {
     pub fn new(
         receiver: Receiver<Option<BlockExtra>>,
         sender: SyncSender<Option<BlockExtra>>,
@@ -45,8 +45,9 @@ impl<T: Utxo> Fee<T> {
                         info!("{}", self.utxo.stat());
                     }
 
-                    self.utxo.add(&block_extra.block, block_extra.height);
-                    let mut prevouts = self.utxo.get(block_extra.height);
+                    let mut prevouts = self
+                        .utxo
+                        .add_outputs_get_inputs(&block_extra.block, block_extra.height);
                     let mut prevouts = prevouts.drain(..);
 
                     for tx in block_extra.block.txdata.iter().skip(1) {

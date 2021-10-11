@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     while let Some(block_extra) = recv.recv()? {
         block_with_witness = false;
         log!(
-            periodic_log_level(block_extra.height),
+            periodic_log_level(block_extra.height, 10_000),
             "# {:7} {} {:?} sig_wit:{} blk_wit:{}",
             block_extra.height,
             block_extra.block_hash,
