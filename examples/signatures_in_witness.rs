@@ -55,9 +55,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 struct ParsedSignature {
-    pub sighash: SigHashType,
-    pub R: Vec<u8>,
-    pub s: Vec<u8>,
+    pub _sighash: SigHashType,
+    pub _R: Vec<u8>,
+    pub _s: Vec<u8>,
 }
 
 impl Decodable for ParsedSignature {
@@ -81,6 +81,10 @@ impl Decodable for ParsedSignature {
         let sighash_u8 = u8::consensus_decode(&mut d)?;
         let sighash = SigHashType::from_u32_consensus(sighash_u8 as u32);
 
-        Ok(ParsedSignature { sighash, R, s })
+        Ok(ParsedSignature {
+            _sighash: sighash,
+            _R: R,
+            _s: s,
+        })
     }
 }
