@@ -1,12 +1,12 @@
 use crate::bitcoin::consensus::Decodable;
-use crate::bitcoin::{BlockHash, Network};
+use crate::bitcoin::{Block, BlockHash, Network};
 use crate::{periodic_log_level, FsBlock};
-use bitcoin::BlockHeader;
-use log::{error, info, log, warn};
+use bitcoin::Error;
+use log::{error, info, log};
 use std::collections::HashSet;
 use std::convert::TryInto;
 use std::fs::File;
-use std::io::{Cursor, Read, Seek, SeekFrom};
+use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
@@ -26,12 +26,29 @@ impl Seen {
     fn new() -> Seen {
         Seen(HashSet::new())
     }
-    fn contains(&self, hash: &BlockHash) -> bool {
-        self.0.contains(&hash[..12])
-    }
     fn insert(&mut self, hash: &BlockHash) -> bool {
         let key: [u8; 12] = (&hash[..12]).try_into().unwrap();
         self.0.insert(key)
+    }
+}
+
+pub struct DetectedBlock {
+    start: usize,
+    end: usize,
+    hash: BlockHash,
+    prev: BlockHash,
+}
+
+impl DetectedBlock {
+    fn into_fs_block(self, file: &Arc<Mutex<File>>) -> FsBlock {
+        FsBlock {
+            start: self.start,
+            end: self.end,
+            hash: self.hash,
+            prev: self.prev,
+            file: Arc::clone(file),
+            next: vec![],
+        }
     }
 }
 
@@ -61,71 +78,29 @@ impl ReadDetect {
         paths.sort();
         info!("There are {} block files", paths.len());
         let mut busy_time = 0u128;
-        let mut count = 0u32;
 
-        // Data struct to be reused to read the content of .dat files. We know the max size is 128MiB
-        // from https://github.com/bitcoin/bitcoin/search?q=MAX_BLOCKFILE_SIZE
-        let mut content = Vec::with_capacity(0x8000000);
+        for (count, path) in paths.into_iter().enumerate() {
+            let file = File::open(&path).unwrap();
+            let mut reader = BufReader::new(file);
 
-        for path in paths {
-            content.clear();
-
-            // instead of sending FsBlock on the channel directly, we quickly insert in the vector
-            // allowing to read ahead exactly one file (reading no block ahead cause non-parallelizing
-            // reading more than 1 file ahead cause cache to work not efficiently)
-            let mut fs_blocks = Vec::with_capacity(128);
-            let mut rolling = RollingU32::default();
-
-            let mut file = File::open(&path).unwrap();
-            file.read_to_end(&mut content).unwrap();
+            let file = File::open(&path).unwrap();
             let file = Arc::new(Mutex::new(file));
 
-            let mut cursor = Cursor::new(&content);
-            while cursor.position() < content.len() as u64 {
-                match u8::consensus_decode(&mut cursor) {
-                    Ok(value) => {
-                        rolling.push(value);
-                        if self.network.magic() != rolling.as_u32() {
-                            continue;
-                        }
-                    }
-                    Err(_) => break, // EOF
-                };
-                let size = u32::consensus_decode(&mut cursor).expect("failed to read size");
-                let start = cursor.position() as usize;
-                match BlockHeader::consensus_decode(&mut cursor) {
-                    Ok(header) => {
-                        cursor
-                            .seek(SeekFrom::Current(i64::from(size - 80))) // remove the parsed header size
-                            .expect("failed to seek forward");
-                        let hash = header.block_hash();
+            let detected_blocks = detect(&mut reader, self.network.magic()).unwrap();
+            let fs_blocks: Vec<_> = detected_blocks
+                .into_iter()
+                .filter(|e| self.seen.insert(&e.hash))
+                .map(|e| e.into_fs_block(&file))
+                .collect();
 
-                        if !self.seen.contains(&hash) {
-                            self.seen.insert(&hash);
-                            let fs_block = FsBlock {
-                                start,
-                                end: cursor.position() as usize,
-                                file: Arc::clone(&file),
-                                hash,
-                                prev: header.prev_blockhash,
-                                next: vec![],
-                            };
-                            fs_blocks.push(fs_block);
-                        } else {
-                            warn!("duplicate block {}", hash);
-                        }
-                    }
-                    Err(e) => error!("error header parsing {:?}", e),
-                }
-            }
+            // TODO if 0 blocks found, maybe wrong directory
+
             log!(
-                periodic_log_level(count, 100),
-                "read {} bytes of {:?}, contains {} blocks",
-                content.len(),
+                periodic_log_level(count as u32, 100),
+                "read {:?}, contains {} blocks",
                 &path,
                 fs_blocks.len()
             );
-            count += 1;
 
             busy_time += now.elapsed().as_nanos();
             self.sender.send(Some(fs_blocks)).expect("cannot send");
@@ -137,6 +112,47 @@ impl ReadDetect {
         );
         self.sender.send(None).expect("cannot send");
     }
+}
+
+pub fn detect<R: Read>(mut reader: &mut R, magic: u32) -> Result<Vec<DetectedBlock>, Error> {
+    let mut rolling = RollingU32::default();
+
+    // instead of sending FsBlock on the channel directly, we quickly insert in the vector
+    // allowing to read ahead exactly one file (reading no block ahead cause non-parallelizing
+    // reading more than 1 file ahead cause cache to work not efficiently)
+    let mut detected_blocks = Vec::with_capacity(128);
+    let mut position = 0usize; // stream_position() not available in 1.46
+
+    loop {
+        match u8::consensus_decode(&mut reader) {
+            Ok(value) => {
+                rolling.push(value);
+                position += 1;
+                if magic != rolling.as_u32() {
+                    continue;
+                }
+            }
+            Err(_) => break, // EOF
+        };
+        let size = u32::consensus_decode(&mut reader)?;
+        position += 4;
+        let start = position;
+        match Block::consensus_decode(&mut reader) {
+            Ok(block) => {
+                position += size as usize;
+                let hash = block.header.block_hash();
+                let detected_block = DetectedBlock {
+                    start,
+                    end: position,
+                    hash,
+                    prev: block.header.prev_blockhash,
+                };
+                detected_blocks.push(detected_block);
+            }
+            Err(e) => error!("error header parsing {:?}", e),
+        }
+    }
+    Ok(detected_blocks)
 }
 
 #[derive(Default, Debug, Copy, Clone)]
@@ -180,5 +196,4 @@ mod test {
         );
         assert_eq!(rolling.as_u32(), bitcoin::Network::Testnet.magic())
     }
-
 }
