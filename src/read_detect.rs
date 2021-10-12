@@ -74,6 +74,7 @@ impl ReadDetect {
             // allowing to read ahead exactly one file (reading no block ahead cause non-parallelizing
             // reading more than 1 file ahead cause cache to work not efficiently)
             let mut fs_blocks = Vec::with_capacity(128);
+            let mut rolling = RollingU32::default();
 
             let mut file = File::open(&path).unwrap();
             file.read_to_end(&mut content).unwrap();
@@ -81,12 +82,10 @@ impl ReadDetect {
 
             let mut cursor = Cursor::new(&content);
             while cursor.position() < content.len() as u64 {
-                match u32::consensus_decode(&mut cursor) {
+                match u8::consensus_decode(&mut cursor) {
                     Ok(value) => {
-                        if self.network.magic() != value {
-                            cursor
-                                .seek(SeekFrom::Current(-3)) // we advanced by 4 with u32::consensus_decode
-                                .expect("failed to seek back");
+                        rolling.push(value);
+                        if self.network.magic() != rolling.as_u32() {
                             continue;
                         }
                     }
@@ -138,4 +137,48 @@ impl ReadDetect {
         );
         self.sender.send(None).expect("cannot send");
     }
+}
+
+#[derive(Default, Debug, Copy, Clone)]
+struct RollingU32(u32);
+impl RollingU32 {
+    fn push(&mut self, byte: u8) {
+        self.0 >>= 8;
+        self.0 |= (byte as u32) << 24;
+    }
+    fn as_u32(&self) -> u32 {
+        self.0
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::read_detect::RollingU32;
+
+    #[test]
+    fn test_rolling() {
+        let mut rolling = RollingU32::default();
+        rolling.push(0x0B);
+        assert_eq!(
+            rolling.as_u32(),
+            u32::from_be_bytes([0x0B, 0x00, 0x00, 0x00])
+        );
+        rolling.push(0x11);
+        assert_eq!(
+            rolling.as_u32(),
+            u32::from_be_bytes([0x11, 0x0b, 0x00, 0x00])
+        );
+        rolling.push(0x09);
+        assert_eq!(
+            rolling.as_u32(),
+            u32::from_be_bytes([0x09, 0x11, 0x0B, 0x00])
+        );
+        rolling.push(0x07);
+        assert_eq!(
+            rolling.as_u32(),
+            u32::from_be_bytes([0x07, 0x09, 0x11, 0x0B])
+        );
+        assert_eq!(rolling.as_u32(), bitcoin::Network::Testnet.magic())
+    }
+
 }
