@@ -243,3 +243,32 @@ pub fn periodic_log_level(i: u32, every: u32) -> Level {
         Level::Debug
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::bitcoin::Network;
+    use crate::{iterate, Config};
+    use std::sync::mpsc::sync_channel;
+
+    #[test]
+    fn test_blk_testnet() {
+        let conf = Config {
+            blocks_dir: "../blocks".into(),
+            network: Network::Testnet,
+            skip_prevout: false,
+            max_reorg: 10,
+            channels_size: 0,
+            #[cfg(feature = "db")]
+            utxo_db: None,
+        };
+        let (send, recv) = sync_channel(0);
+
+        let handle = iterate(conf, send);
+        while let Some(b) = recv.recv().unwrap() {
+            if b.height == 394 {
+                assert_eq!(b.fee(), Some(50_000));
+            }
+        }
+        handle.join().unwrap();
+    }
+}
