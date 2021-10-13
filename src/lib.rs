@@ -249,6 +249,7 @@ mod test {
     use crate::bitcoin::Network;
     use crate::{iterate, Config};
     use std::sync::mpsc::sync_channel;
+    use tempfile::TempDir;
 
     #[test]
     fn test_blk_testnet() {
@@ -263,6 +264,39 @@ mod test {
         };
         let (send, recv) = sync_channel(0);
 
+        let handle = iterate(conf, send);
+        while let Some(b) = recv.recv().unwrap() {
+            if b.height == 394 {
+                assert_eq!(b.fee(), Some(50_000));
+            }
+        }
+        handle.join().unwrap();
+    }
+
+    #[cfg(feature = "db")]
+    #[test]
+    fn test_blk_testnet_db() {
+        let tempdir = TempDir::new().unwrap();
+        let conf = Config {
+            blocks_dir: "../blocks".into(),
+            network: Network::Testnet,
+            skip_prevout: false,
+            max_reorg: 10,
+            channels_size: 0,
+            utxo_db: Some(tempdir.path().to_path_buf()),
+        };
+        let (send, recv) = sync_channel(0);
+
+        let handle = iterate(conf.clone(), send);
+        while let Some(b) = recv.recv().unwrap() {
+            if b.height == 394 {
+                assert_eq!(b.fee(), Some(50_000));
+            }
+        }
+        handle.join().unwrap();
+
+        // iterating twice, this time prevouts come directly from db
+        let (send, recv) = sync_channel(0);
         let handle = iterate(conf, send);
         while let Some(b) = recv.recv().unwrap() {
             if b.height == 394 {

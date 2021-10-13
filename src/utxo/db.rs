@@ -1,18 +1,25 @@
 use crate::bitcoin::consensus::serialize;
 use crate::bitcoin::{Block, OutPoint, TxOut};
-use crate::utxo::{Hash32, Hash64, UtxoStore};
+use crate::utxo::UtxoStore;
 use bitcoin::consensus::deserialize;
-use log::debug;
+use log::{debug, info};
+use rand::Rng;
 use rocksdb::{DBCompressionType, Options, WriteBatch, DB};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::path::Path;
 
+type Key = [u8; 12];
+
 pub struct DbUtxo {
     db: DB,
     updated_up_to_height: i32,
     inserted_outputs: u64,
+    salt: Key,
 }
+
+const SALT: &'static str = "salt";
+const UPDATED_UP_TO_HEIGHT: &'static str = "updated_up_to_height";
 
 impl DbUtxo {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<DbUtxo, rocksdb::Error> {
@@ -22,15 +29,30 @@ impl DbUtxo {
         let db = DB::open(&options, path)?;
 
         let updated_up_to_height = db
-            .get("updated_up_to_height")?
+            .get(UPDATED_UP_TO_HEIGHT)?
             .map(|e| e.try_into().unwrap())
             .map(|e| i32::from_ne_bytes(e))
             .unwrap_or(-1);
+
+        let salt: Option<Key> = db.get(SALT)?.map(|e| e.try_into().unwrap());
+        let salt = match salt {
+            Some(salt) => salt,
+            None => {
+                let salt = rand::thread_rng().gen::<Key>();
+                db.put(SALT, &salt)?;
+                salt
+            }
+        };
+        info!(
+            "using salt: {:?} updated_height: {}",
+            salt, updated_up_to_height
+        );
 
         Ok(DbUtxo {
             db,
             updated_up_to_height,
             inserted_outputs: 0,
+            salt,
         })
     }
 }
@@ -68,7 +90,7 @@ impl UtxoStore for DbUtxo {
                             prevouts.push(tx_out.clone())
                         }
                         None => {
-                            let key = input.previous_output.to_key();
+                            let key = input.previous_output.to_key(self.salt.clone());
                             let tx_out = deserialize(&self.db.get(&key).unwrap().unwrap()).unwrap();
                             batch.delete(&key);
                             prevouts.push(tx_out);
@@ -79,11 +101,11 @@ impl UtxoStore for DbUtxo {
 
             // and we put all the remaining outputs in db
             for (k, v) in block_outputs.drain() {
-                batch.put(&k.to_key(), serialize(v));
+                batch.put(&k.to_key(self.salt.clone()), serialize(v));
                 self.inserted_outputs += 1;
             }
             batch.put(height.to_ne_bytes(), serialize(&prevouts));
-            batch.put("updated_up_to_height", height.to_ne_bytes());
+            batch.put(UPDATED_UP_TO_HEIGHT, height.to_ne_bytes());
             self.db.write(batch).unwrap(); // TODO unwrap
         }
         self.db
@@ -102,30 +124,39 @@ impl UtxoStore for DbUtxo {
 }
 
 trait ToKey<T: AsRef<[u8]>> {
-    fn to_key(&self) -> T;
+    fn to_key(&self, salt: T) -> T;
 }
 
-impl ToKey<[u8; 12]> for OutPoint {
-    fn to_key(&self) -> [u8; 12] {
-        let h64 = self.hash64().to_ne_bytes();
-        let h32 = self.hash32().to_ne_bytes();
-        let mut result = [0u8; 12];
-        result[..8].copy_from_slice(&h64);
-        result[8..].copy_from_slice(&h32);
-        result
+impl ToKey<Key> for OutPoint {
+    fn to_key(&self, mut salt: Key) -> Key {
+        for (i, b) in self
+            .txid
+            .iter()
+            .chain(self.vout.to_be_bytes().iter())
+            .enumerate()
+        {
+            salt[i % 12] ^= b;
+        }
+        salt
     }
 }
 
 #[cfg(test)]
 mod test {
-    use rocksdb::DB;
+    use crate::utxo::db::ToKey;
+    use bitcoin::OutPoint;
 
     #[test]
-    fn test_rocks() {
-        let db = DB::open_default("rocks").unwrap();
+    fn test_xor() {
+        let mut outpoint = OutPoint::default();
+        outpoint.vout = 0;
+        let salt = [1u8; 12];
 
-        for i in 0i32..10_000_000 {
-            db.put(&format!("key{}", i), &i.to_ne_bytes()).unwrap();
-        }
+        assert_eq!(&outpoint.to_key(salt.clone()), &salt);
+        outpoint.vout = 1;
+        assert_eq!(
+            &outpoint.to_key(salt.clone()),
+            &[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0]
+        );
     }
 }

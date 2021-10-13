@@ -17,16 +17,18 @@ log = "0.4.11"
 glob = "0.3.0"
 fxhash = "0.2.1"
 
+rand = { version = "0.8.4", optional = true }
 rocksdb = { version = "0.17.0", optional = true, default-features = false, features = ["snappy"] }
 
 [dev-dependencies]
 env_logger = "0.9"
 bitcoinconsensus = "0.19.0-3"
 rayon = "1.5.0"
+tempfile = "3.2.0"
 
 [features]
 verify = ["bitcoin/bitcoinconsensus"]
-db = ["rocksdb"]
+db = ["rocksdb", "rand"]
 
 [[example]]
 name = "heaviest"

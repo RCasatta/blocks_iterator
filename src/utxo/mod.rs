@@ -26,10 +26,6 @@ trait Hash64 {
     fn hash64(&self) -> u64;
 }
 
-trait Hash32 {
-    fn hash32(&self) -> u32;
-}
-
 pub enum AnyUtxo {
     #[cfg(feature = "db")]
     Db(db::DbUtxo),
@@ -57,11 +53,5 @@ impl UtxoStore for AnyUtxo {
 impl Hash64 for OutPoint {
     fn hash64(&self) -> u64 {
         fxhash::hash64(self)
-    }
-}
-
-impl Hash32 for OutPoint {
-    fn hash32(&self) -> u32 {
-        fxhash::hash32(self)
     }
 }
