@@ -249,7 +249,6 @@ mod test {
     use crate::bitcoin::Network;
     use crate::{iterate, Config};
     use std::sync::mpsc::sync_channel;
-    use tempfile::TempDir;
 
     #[test]
     fn test_blk_testnet() {
@@ -276,7 +275,7 @@ mod test {
     #[cfg(feature = "db")]
     #[test]
     fn test_blk_testnet_db() {
-        let tempdir = TempDir::new().unwrap();
+        let tempdir = tempfile::TempDir::new().unwrap();
         let conf = Config {
             blocks_dir: "../blocks".into(),
             network: Network::Testnet,

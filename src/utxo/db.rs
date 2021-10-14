@@ -90,7 +90,7 @@ impl UtxoStore for DbUtxo {
                             prevouts.push(tx_out.clone())
                         }
                         None => {
-                            let key = input.previous_output.to_key(self.salt.clone());
+                            let key = input.previous_output.to_key(&self.salt);
                             let tx_out = deserialize(&self.db.get(&key).unwrap().unwrap()).unwrap();
                             batch.delete(&key);
                             prevouts.push(tx_out);
@@ -101,7 +101,7 @@ impl UtxoStore for DbUtxo {
 
             // and we put all the remaining outputs in db
             for (k, v) in block_outputs.drain() {
-                batch.put(&k.to_key(self.salt.clone()), serialize(v));
+                batch.put(&k.to_key(&self.salt), serialize(v));
                 self.inserted_outputs += 1;
             }
             batch.put(height.to_ne_bytes(), serialize(&prevouts));
@@ -124,20 +124,19 @@ impl UtxoStore for DbUtxo {
 }
 
 trait ToKey<T: AsRef<[u8]>> {
-    fn to_key(&self, salt: T) -> T;
+    fn to_key(&self, salt: &T) -> T;
 }
 
 impl ToKey<Key> for OutPoint {
-    fn to_key(&self, mut salt: Key) -> Key {
-        for (i, b) in self
-            .txid
-            .iter()
-            .chain(self.vout.to_be_bytes().iter())
-            .enumerate()
-        {
-            salt[i % 12] ^= b;
-        }
-        salt
+    fn to_key(&self, salt: &Key) -> Key {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&salt[..]);
+        hasher.update(self.txid.as_ref());
+        hasher.update(&self.vout.to_ne_bytes());
+        let hash = hasher.finalize();
+        let mut result = [0u8; 12];
+        result.copy_from_slice(&hash.as_bytes()[..12]);
+        result
     }
 }
 
@@ -147,16 +146,12 @@ mod test {
     use bitcoin::OutPoint;
 
     #[test]
-    fn test_xor() {
+    fn test_key_hash() {
         let mut outpoint = OutPoint::default();
         outpoint.vout = 0;
         let salt = [1u8; 12];
-
-        assert_eq!(&outpoint.to_key(salt.clone()), &salt);
+        let before = outpoint.to_key(&salt);
         outpoint.vout = 1;
-        assert_eq!(
-            &outpoint.to_key(salt.clone()),
-            &[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0]
-        );
+        assert_ne!(&outpoint.to_key(&salt), &before);
     }
 }
