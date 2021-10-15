@@ -39,6 +39,8 @@ jobs:
         with:
           command: test
           args:  --verbose
+      - run: cargo +nightly bench --features unstable
+        if: ${{ matrix.rust == 'nightly' }}
 
   examples:
     runs-on: ubuntu-20.04
