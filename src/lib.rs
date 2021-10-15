@@ -14,6 +14,9 @@
 #![deny(unused_imports)]
 #![deny(missing_docs)]
 #![deny(unused_must_use)]
+#![cfg_attr(all(test, feature = "unstable"), feature(test))]
+#[cfg(all(test, feature = "unstable"))]
+extern crate test;
 
 use bitcoin::consensus::Decodable;
 use bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut};
@@ -245,7 +248,7 @@ pub fn periodic_log_level(i: u32, every: u32) -> Level {
 }
 
 #[cfg(test)]
-mod test {
+mod inner_test {
     use crate::bitcoin::Network;
     use crate::{iterate, Config};
     use std::sync::mpsc::sync_channel;
