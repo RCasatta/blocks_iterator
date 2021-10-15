@@ -19,7 +19,7 @@ jobs:
       - name: clippy
         run: cargo clippy -- -D warnings
 
-  build:
+  test:
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
@@ -37,8 +37,8 @@ jobs:
           override: true
       - uses: actions-rs/cargo@v1
         with:
-          command: build
-          args:  --verbose --all
+          command: test
+          args:  --verbose
 
   examples:
     runs-on: ubuntu-20.04

@@ -14,6 +14,9 @@
 #![deny(unused_imports)]
 #![deny(missing_docs)]
 #![deny(unused_must_use)]
+#![cfg_attr(all(test, feature = "unstable"), feature(test))]
+#[cfg(all(test, feature = "unstable"))]
+extern crate test;
 
 use bitcoin::consensus::Decodable;
 use bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut};
@@ -245,7 +248,7 @@ pub fn periodic_log_level(i: u32, every: u32) -> Level {
 }
 
 #[cfg(test)]
-mod test {
+mod inner_test {
     use crate::bitcoin::Network;
     use crate::{iterate, Config};
     use std::sync::mpsc::sync_channel;
@@ -303,5 +306,98 @@ mod test {
             }
         }
         handle.join().unwrap();
+    }
+}
+
+#[cfg(all(test, feature = "unstable"))]
+mod bench {
+    use crate::bitcoin::hashes::{sha256, Hash, HashEngine};
+    use crate::bitcoin::OutPoint;
+    use bitcoin::hashes::sha256::Midstate;
+    use sha2::{Digest, Sha256};
+    use test::{black_box, Bencher};
+
+    #[bench]
+    fn bench_blake3(b: &mut Bencher) {
+        let outpoint = OutPoint::default();
+        let salt = [0u8; 12];
+
+        b.iter(|| {
+            let mut hasher = blake3::Hasher::new();
+            hasher.update(&salt[..]);
+            hasher.update(outpoint.txid.as_ref());
+            hasher.update(&outpoint.vout.to_ne_bytes());
+            let hash = hasher.finalize();
+            let mut result = [0u8; 12];
+            result.copy_from_slice(&hash.as_bytes()[..12]);
+            result
+        });
+    }
+
+    #[bench]
+    fn bench_bitcoin_hashes_sha(b: &mut Bencher) {
+        let outpoint = OutPoint::default();
+        let salt = [0u8; 12];
+
+        b.iter(|| {
+            let mut engine = sha256::Hash::engine();
+            engine.input(&salt);
+            engine.input(&outpoint.txid.as_ref());
+            engine.input(&outpoint.vout.to_ne_bytes()[..]);
+            let hash = sha256::Hash::from_engine(engine);
+            let mut result = [0u8; 12];
+            result.copy_from_slice(&hash.into_inner()[..12]);
+            black_box(result);
+        });
+    }
+
+    #[bench]
+    fn bench_bitcoin_hashes_sha_midstate(b: &mut Bencher) {
+        let outpoint = OutPoint::default();
+        let salt = [0u8; 32];
+        let midstate = Midstate(salt);
+        let midstate_engine = sha256::HashEngine::from_midstate(midstate, 64);
+        b.iter(|| {
+            let mut engine = midstate_engine.clone();
+            engine.input(&outpoint.txid.as_ref());
+            engine.input(&outpoint.vout.to_ne_bytes()[..]);
+            let hash = sha256::Hash::from_engine(engine);
+            let mut result = [0u8; 12];
+            result.copy_from_slice(&hash.into_inner()[..12]);
+            black_box(result);
+        });
+    }
+
+    #[bench]
+    fn bench_sha2_crate(b: &mut Bencher) {
+        let outpoint = OutPoint::default();
+        let salt = [0u8; 12];
+
+        b.iter(|| {
+            let mut hasher = Sha256::new();
+            hasher.update(&salt);
+            hasher.update(&outpoint.txid.as_ref());
+            hasher.update(&outpoint.vout.to_ne_bytes()[..]);
+            let hash = hasher.finalize();
+            let mut result = [0u8; 12];
+            result.copy_from_slice(&hash[..12]);
+            black_box(result);
+        });
+    }
+
+    #[bench]
+    fn bench_fxhash(b: &mut Bencher) {
+        let outpoint = OutPoint::default();
+        let salt = [0u8; 12];
+
+        b.iter(|| {
+            let a = fxhash::hash32(&(&outpoint, &salt));
+            let b = fxhash::hash64(&(&outpoint, &salt));
+            let mut result = [0u8; 12];
+
+            result[..4].copy_from_slice(&a.to_ne_bytes()[..]);
+            result[4..].copy_from_slice(&b.to_ne_bytes()[..]);
+            black_box(result);
+        });
     }
 }

@@ -1,4 +1,5 @@
 use crate::bitcoin::consensus::serialize;
+use crate::bitcoin::hashes::{sha256, Hash, HashEngine};
 use crate::bitcoin::{Block, OutPoint, TxOut};
 use crate::utxo::UtxoStore;
 use bitcoin::consensus::deserialize;
@@ -129,13 +130,13 @@ trait ToKey<T: AsRef<[u8]>> {
 
 impl ToKey<Key> for OutPoint {
     fn to_key(&self, salt: &Key) -> Key {
-        let mut hasher = blake3::Hasher::new();
-        hasher.update(&salt[..]);
-        hasher.update(self.txid.as_ref());
-        hasher.update(&self.vout.to_ne_bytes());
-        let hash = hasher.finalize();
+        let mut engine = sha256::HashEngine::default();
+        engine.input(&salt[..]);
+        engine.input(&self.txid.as_ref());
+        engine.input(&self.vout.to_ne_bytes()[..]);
+        let hash = sha256::Hash::from_engine(engine);
         let mut result = [0u8; 12];
-        result.copy_from_slice(&hash.as_bytes()[..12]);
+        result.copy_from_slice(&hash.into_inner()[..12]);
         result
     }
 }
