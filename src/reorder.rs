@@ -145,8 +145,7 @@ impl Reorder {
                         }
                         self.blocks.add(raw_block);
                         while let Some(block_to_send) = self.blocks.remove(&self.next) {
-                            let block_extra: BlockExtra =
-                                block_to_send.try_into().expect("should find the file");
+                            let block_extra: BlockExtra = block_to_send.try_into().unwrap();
                             busy_time += now.elapsed().as_nanos();
                             self.send(block_extra);
                             now = Instant::now();

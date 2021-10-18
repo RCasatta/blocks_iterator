@@ -117,9 +117,9 @@ impl ReadDetect {
 pub fn detect<R: Read>(mut reader: &mut R, magic: u32) -> Result<Vec<DetectedBlock>, Error> {
     let mut rolling = RollingU32::default();
 
-    // instead of sending FsBlock on the channel directly, we quickly insert in the vector
+    // Instead of sending DetecetdBlock on the channel directly, we quickly insert in the vector
     // allowing to read ahead exactly one file (reading no block ahead cause non-parallelizing
-    // reading more than 1 file ahead cause cache to work not efficiently)
+    // reading, more than 1 file ahead cause cache to work not efficiently)
     let mut detected_blocks = Vec::with_capacity(128);
     let mut position = 0usize; // stream_position() not available in 1.46
 
@@ -149,12 +149,14 @@ pub fn detect<R: Read>(mut reader: &mut R, magic: u32) -> Result<Vec<DetectedBlo
                 };
                 detected_blocks.push(detected_block);
             }
-            Err(e) => error!("error header parsing {:?}", e),
+            Err(e) => error!("error block parsing {:?}", e),
         }
     }
     Ok(detected_blocks)
 }
 
+/// Implements a rolling u32, every time a new u8 is `push`ed the old value is shifted by 1 byte
+/// Allows to read a stream searching for a u32 magic without going back
 #[derive(Default, Debug, Copy, Clone)]
 struct RollingU32(u32);
 impl RollingU32 {

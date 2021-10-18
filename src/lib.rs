@@ -145,16 +145,17 @@ pub struct FsBlock {
 }
 
 impl TryFrom<FsBlock> for BlockExtra {
-    type Error = ();
+    type Error = String;
 
     fn try_from(fs_block: FsBlock) -> Result<Self, Self::Error> {
-        let mut guard = fs_block.file.lock().unwrap();
+        let err = |e: String, f: &FsBlock | -> String { format!("{:?} {:?}", e, f) };
+        let mut guard = fs_block.file.lock().map_err(|e| err(e.to_string(), &fs_block))?;
         let file = guard.deref_mut();
         file.seek(SeekFrom::Start(fs_block.start as u64))
-            .map_err(|_| ())?;
+            .map_err(|e| err(e.to_string(), &fs_block))?;
         let reader = BufReader::new(file);
         Ok(BlockExtra {
-            block: Block::consensus_decode(reader).map_err(|_| ())?,
+            block: Block::consensus_decode(reader).map_err(|e| err(e.to_string(), &fs_block))?,
             block_hash: fs_block.hash,
             size: (fs_block.end - fs_block.start) as u32,
             next: fs_block.next,
