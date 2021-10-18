@@ -30,9 +30,8 @@ tempfile = "3.2.0"
 
 [features]
 verify = ["bitcoin/bitcoinconsensus"]
-db = ["rocksdb", "rand", "blake3"]
-neon = ["blake3/neon"]
-unstable = ["sha2"]
+db = ["rocksdb", "rand"]
+unstable = ["sha2", "blake3"]
 
 [[example]]
 name = "heaviest"
