@@ -13,15 +13,17 @@ Features:
 
 Running [iterate](examples/iterate.rs) example on threadripper 1950X, Testnet @ 2090k, Mainnet @ 709k. Spinning disk.
 
-| Network | `--skip--prevout` | `--max-reorg` | `utxo-db` | Memory | Time   |
-|---------|-------------------|---------------|----------:|-------:|-------:|
-| Mainnet | false             |            6  | no        |  8.3GB |  1h:15m |*
-| Mainnet | true              |            6  | no        |  157MB |  1h:00m |*
+| Network | `--skip--prevout` | `--max-reorg` | `utxo-db` | Memory | Time    |
+|---------|-------------------|---------------|----------:|-------:|--------:|
+| Mainnet | false             |           6   | no        |  TODO  | TODO    |
+| Mainnet | true              |           6   | no        |  TODO  | TODO    |
+| Mainnet | false             |           6   | 1 run     |  TODO  | TODO    |
+| Mainnet | false             |           6   | 2 run     |  TODO  | TODO    |
 
-| Testnet | false             |           40  | no        |  2.4GB |  5m:12s |
-| Testnet | true              |           40  | no        |  221MB |  5m:12s |
+| Testnet | false             |           40  | no        |  123MB |  3m:03s |
+| Testnet | true              |           40  | no        |  1.4GB |  9m:07s |
 | Testnet | false             |           40  | 1 run     |  247MB | 16m:12s |
-| Testnet | true              |           40  | 2 run     |  221MB |  8m:32s |
+| Testnet | false             |           40  | 2 run     |  221MB |  8m:32s |
 
 
 

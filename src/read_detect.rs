@@ -6,7 +6,7 @@ use log::{error, info, log};
 use std::collections::HashSet;
 use std::convert::TryInto;
 use std::fs::File;
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Seek};
 use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
@@ -82,11 +82,12 @@ impl ReadDetect {
         for (count, path) in paths.into_iter().enumerate() {
             let file = File::open(&path).unwrap();
             let mut reader = BufReader::new(file);
+            let detected_blocks = detect(&mut reader, self.network.magic()).unwrap();
+            drop(reader);
 
             let file = File::open(&path).unwrap();
             let file = Arc::new(Mutex::new(file));
 
-            let detected_blocks = detect(&mut reader, self.network.magic()).unwrap();
             let fs_blocks: Vec<_> = detected_blocks
                 .into_iter()
                 .filter(|e| self.seen.insert(&e.hash))
@@ -114,20 +115,18 @@ impl ReadDetect {
     }
 }
 
-pub fn detect<R: Read>(mut reader: &mut R, magic: u32) -> Result<Vec<DetectedBlock>, Error> {
+pub fn detect<R: Read + Seek>(mut reader: &mut R, magic: u32) -> Result<Vec<DetectedBlock>, Error> {
     let mut rolling = RollingU32::default();
 
     // Instead of sending DetecetdBlock on the channel directly, we quickly insert in the vector
     // allowing to read ahead exactly one file (reading no block ahead cause non-parallelizing
     // reading, more than 1 file ahead cause cache to work not efficiently)
     let mut detected_blocks = Vec::with_capacity(128);
-    let mut position = 0usize; // stream_position() not available in 1.46
 
     loop {
         match u8::consensus_decode(&mut reader) {
             Ok(value) => {
                 rolling.push(value);
-                position += 1;
                 if magic != rolling.as_u32() {
                     continue;
                 }
@@ -135,21 +134,26 @@ pub fn detect<R: Read>(mut reader: &mut R, magic: u32) -> Result<Vec<DetectedBlo
             Err(_) => break, // EOF
         };
         let size = u32::consensus_decode(&mut reader)?;
-        position += 4;
-        let start = position;
+        let start = reader.stream_position().unwrap() as usize;
         match Block::consensus_decode(&mut reader) {
             Ok(block) => {
-                position += size as usize;
+                let end = reader.stream_position().unwrap() as usize;
+                assert_eq!(size as usize, end - start);
                 let hash = block.header.block_hash();
                 let detected_block = DetectedBlock {
                     start,
-                    end: position,
+                    end,
                     hash,
                     prev: block.header.prev_blockhash,
                 };
                 detected_blocks.push(detected_block);
             }
-            Err(e) => error!("error block parsing {:?}", e),
+            Err(e) => {
+                // It's mandatory to use stream_position (require MSRV 1.51) because I can't maintain
+                // a byte read position because in case of error I don't know how many bytes of the
+                // reader has been consumed
+                error!("error block parsing {:?}", e)
+            }
         }
     }
     Ok(detected_blocks)

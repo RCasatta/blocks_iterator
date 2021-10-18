@@ -20,7 +20,7 @@ extern crate test;
 
 use bitcoin::consensus::Decodable;
 use bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut};
-use log::{info, Level};
+use log::{debug, info, Level};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fs::File;
@@ -148,11 +148,15 @@ impl TryFrom<FsBlock> for BlockExtra {
     type Error = String;
 
     fn try_from(fs_block: FsBlock) -> Result<Self, Self::Error> {
-        let err = |e: String, f: &FsBlock | -> String { format!("{:?} {:?}", e, f) };
-        let mut guard = fs_block.file.lock().map_err(|e| err(e.to_string(), &fs_block))?;
+        let err = |e: String, f: &FsBlock| -> String { format!("{:?} {:?}", e, f) };
+        let mut guard = fs_block
+            .file
+            .lock()
+            .map_err(|e| err(e.to_string(), &fs_block))?;
         let file = guard.deref_mut();
         file.seek(SeekFrom::Start(fs_block.start as u64))
             .map_err(|e| err(e.to_string(), &fs_block))?;
+        debug!("going to read: {:?}", file);
         let reader = BufReader::new(file);
         Ok(BlockExtra {
             block: Block::consensus_decode(reader).map_err(|e| err(e.to_string(), &fs_block))?,
