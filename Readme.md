@@ -11,21 +11,18 @@ Features:
 
 ## Memory requirements and performance
 
-Running [iterate](examples/iterate.rs) example on threadripper 1950X, Testnet @ 2090k, Mainnet @ 709k. Spinning disk.
+Running [iterate](examples/iterate.rs) example on threadripper 1950X, Testnet @ 2090k, Mainnet @ 705k. Spinning disk.
 
 | Network | `--skip--prevout` | `--max-reorg` | `utxo-db` | Memory | Time    |
 |---------|-------------------|---------------|----------:|-------:|--------:|
-| Mainnet | false             |           6   | no        |  TODO  | TODO    |
-| Mainnet | true              |           6   | no        |  TODO  | TODO    |
-| Mainnet | false             |           6   | 1 run     |  TODO  | TODO    |
-| Mainnet | false             |           6   | 2 run     |  TODO  | TODO    |
-
+| Mainnet | false             |           6   | no        |   33MB |  1h:00m |
+| Mainnet | true              |           6   | no        |  5.3GB |  1h:29m |
+| Mainnet | false             |           6   | 1 run     |  201MB |  9h:42m |
+| Mainnet | false             |           6   | 2 run     |  113MB |  1h:05m |
 | Testnet | false             |           40  | no        |  123MB |  3m:03s |
 | Testnet | true              |           40  | no        |  1.4GB |  9m:07s |
 | Testnet | false             |           40  | 1 run     |  247MB | 16m:12s |
 | Testnet | false             |           40  | 2 run     |  221MB |  8m:32s |
-
-
 
 ## Examples
 
