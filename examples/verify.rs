@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
             buffer.clear();
         }
-        println!("errors: {:?}", error_count);
+        info!("errors: {:?}", error_count);
     });
 
     while let Some(mut block_extra) = recv.recv()? {

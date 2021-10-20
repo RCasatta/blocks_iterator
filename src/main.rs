@@ -1,7 +1,10 @@
+use blocks_iterator::bitcoin::consensus::serialize;
 use blocks_iterator::{periodic_log_level, Config};
 use env_logger::Env;
 use log::{info, log};
 use std::error::Error;
+use std::io;
+use std::io::Write;
 use std::sync::mpsc::sync_channel;
 use structopt::StructOpt;
 
@@ -20,6 +23,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             block_extra.block_hash,
             block_extra.fee()
         );
+        let ser = serialize(&block_extra);
+        io::stdout().write_all(&ser)?;
     }
     handle.join().expect("couldn't join");
     info!("end");

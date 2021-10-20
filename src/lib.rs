@@ -18,14 +18,10 @@
 #[cfg(all(test, feature = "unstable"))]
 extern crate test;
 
-use bitcoin::consensus::Decodable;
-use bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut};
-use log::{debug, info, Level};
-use std::collections::HashMap;
-use std::convert::TryFrom;
+use bitcoin::BlockHash;
+use log::{info, Level};
 use std::fs::File;
-use std::io::{BufReader, Seek, SeekFrom};
-use std::ops::DerefMut;
+
 use std::path::PathBuf;
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::{Arc, Mutex};
@@ -35,7 +31,9 @@ use std::time::Instant;
 use structopt::StructOpt;
 use utxo::AnyUtxo;
 
+mod block_extra;
 mod fee;
+mod pipe;
 mod read_detect;
 mod reorder;
 mod utxo;
@@ -46,6 +44,9 @@ pub use fxhash;
 pub use glob;
 pub use log;
 pub use structopt;
+
+pub use block_extra::BlockExtra;
+pub use pipe::PipeIterator;
 
 /// Configuration parameters, most important the bitcoin blocks directory
 #[derive(StructOpt, Debug, Clone)]
@@ -94,26 +95,6 @@ impl Config {
     }
 }
 
-/// The bitcoin block and additional metadata returned by the [iterate] method
-#[derive(Debug)]
-pub struct BlockExtra {
-    /// The bitcoin block
-    pub block: Block,
-    /// The bitcoin block hash, same as `block.block_hash()` but result from hashing is cached
-    pub block_hash: BlockHash,
-    /// The byte size of the block, as returned by in `serialize(block).len()`
-    pub size: u32,
-    /// Hash of the blocks following this one, it's a vec because during reordering they may be more
-    /// than one because of reorgs, as a result from [iterate], it's just one.
-    pub next: Vec<BlockHash>,
-    /// The height of the current block, number of blocks between this one and the genesis block
-    pub height: u32,
-    /// All the previous outputs of this block. Allowing to validate the script or computing the fee
-    /// Note that when configuration `skip_script_pubkey` is true, the script is empty,
-    /// when `skip_prevout` is true, this map is empty.
-    pub outpoint_values: HashMap<OutPoint, TxOut>,
-}
-
 /// Before reorder we keep only the position of the block in the file system and data relative
 /// to the block hash, the previous hash and the following hash (populated during reorder phase)
 /// We will need to read the block from disk again, but by doing so we will avoid using too much
@@ -142,57 +123,6 @@ pub struct FsBlock {
     /// The hash of the blocks following this one. It is populated during the reorder phase, it can
     /// be more than one because of reorgs.
     pub next: Vec<BlockHash>,
-}
-
-impl TryFrom<FsBlock> for BlockExtra {
-    type Error = String;
-
-    fn try_from(fs_block: FsBlock) -> Result<Self, Self::Error> {
-        let err = |e: String, f: &FsBlock| -> String { format!("{:?} {:?}", e, f) };
-        let mut guard = fs_block
-            .file
-            .lock()
-            .map_err(|e| err(e.to_string(), &fs_block))?;
-        let file = guard.deref_mut();
-        file.seek(SeekFrom::Start(fs_block.start as u64))
-            .map_err(|e| err(e.to_string(), &fs_block))?;
-        debug!("going to read: {:?}", file);
-        let reader = BufReader::new(file);
-        Ok(BlockExtra {
-            block: Block::consensus_decode(reader).map_err(|e| err(e.to_string(), &fs_block))?,
-            block_hash: fs_block.hash,
-            size: (fs_block.end - fs_block.start) as u32,
-            next: fs_block.next,
-            height: 0,
-            outpoint_values: Default::default(),
-        })
-    }
-}
-
-impl BlockExtra {
-    /// Returns the average transaction fee in the block
-    pub fn average_fee(&self) -> Option<f64> {
-        Some(self.fee()? as f64 / self.block.txdata.len() as f64)
-    }
-
-    /// Returns the total fee of the block
-    pub fn fee(&self) -> Option<u64> {
-        let mut total = 0u64;
-        for tx in self.block.txdata.iter() {
-            total += self.tx_fee(tx)?;
-        }
-        Some(total)
-    }
-
-    /// Returns the fee of a transaction contained in the block
-    pub fn tx_fee(&self, tx: &Transaction) -> Option<u64> {
-        let output_total: u64 = tx.output.iter().map(|el| el.value).sum();
-        let mut input_total = 0u64;
-        for input in tx.input.iter() {
-            input_total += self.outpoint_values.get(&input.previous_output)?.value;
-        }
-        Some(input_total - output_total)
-    }
 }
 
 /// Read `blocks*.dat` contained in the `config.blocks_dir` directory and returns [BlockExtra]

@@ -47,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [ "heaviest", "iterate", "most_output", "verify --features verify", "signatures_in_witness", "outputs_versions"]
+        example: [ "verify --features verify", "signatures_in_witness", "outputs_versions"]
     steps:
       - uses: actions/checkout@v2
       - uses: Swatinem/rust-cache@v1.2.0
@@ -63,3 +63,24 @@ jobs:
         with:
           command: run
           args: --example ${{ matrix.example }} -- --blocks-dir blocks --network testnet
+
+  pipe-example:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: Swatinem/rust-cache@v1.2.0
+        with:
+          key: ${{ matrix.example }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --examples
+      - run: ./target/release/blocks_iterator --blocks-dir blocks --network testnet --max-reorg 40 | ./target/release/examples/most_output_pipe | ./target/release/examples/heaviest_pipe >/dev/null

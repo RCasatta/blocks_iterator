@@ -9,6 +9,19 @@ Features:
 * Blocks are returned in height order, it avoids following reorgs (see `max_reorg` parameter)
 * Blocks come with [metadata](https://docs.rs/blocks_iterator/latest/blocks_iterator/struct.BlockExtra.html) like all block's previous outputs, it allows computing transactions fee or [verifying](examples/verify.rs) scripts in the blockchain.
 
+# Pipes
+
+Other than inside Rust programs, ordered blocks with prevouts could be iterated using Unix pipes.
+
+```
+$ cargo build --release 
+$ cargo build --release --examples
+$ ./target/release/blocks_iterator --blocks-dir /Volumes/Transcend/bitcoin-testnet/testnet3/blocks --network testnet --max-reorg 40 | ./target/release/examples/most_output_pipe | ./target/release/examples/heaviest_pipe >/dev/null
+...
+[2021-10-21T10:10:24Z INFO  most_output_pipe] most_output tx is d28305817238ee92e5d9ac0d81c3bf5ecf7399528e6d87226d726e4070c7e665 with #outputs: 30001
+[2021-10-21T10:10:24Z INFO  heaviest_pipe] heaviest tx is 73e64e38faea386c88a578fd1919bcdba3d0b3af7b6302bf6ee1b423dc4e4333 with weight: 3999608
+```
+
 ## Memory requirements and performance
 
 Running [iterate](examples/iterate.rs) example on threadripper 1950X, Testnet @ 2090k, Mainnet @ 705k. Spinning disk.
@@ -33,8 +46,8 @@ cargo run --release --example iterate
 ```
 
 * [iterate](examples/iterate.rs) iterate over blocks and print block fee
-* [heaviest](examples/heaviest.rs) find the transaction with greatest weight
-* [most_output](examples/most_output.rs) find the transaction with most output
+* [heaviest](examples/heaviest_pipe) find the transaction with greatest weight
+* [most_output](examples/most_output_pipe) find the transaction with most output
 * [verify](examples/verify.rs) verify transactions
 
 ## Similar projects
