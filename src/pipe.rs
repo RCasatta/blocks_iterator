@@ -19,7 +19,7 @@ impl PipeIterator {
         PipeIterator {
             stdin,
             stdout,
-            buffer: Vec::with_capacity(MAX_BLOCK_EXTRA_SIZE),
+            buffer: vec![0u8; MAX_BLOCK_EXTRA_SIZE],
         }
     }
 }
