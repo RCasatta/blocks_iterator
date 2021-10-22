@@ -146,15 +146,12 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
         } else {
             send_ordered_blocks
         };
-        let mut reorder = reorder::Reorder::new(
+        let _reorder = reorder::Reorder::new(
             config.network,
             config.max_reorg,
             receive_block_fs,
             send_ordered_blocks,
         );
-        let orderer_handle = thread::spawn(move || {
-            reorder.start();
-        });
 
         if !config.skip_prevout {
             let mut fee = fee::Fee::new(receive_ordered_blocks, channel, config.utxo_manager());
@@ -164,7 +161,6 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
             fee_handle.join().unwrap();
         }
 
-        orderer_handle.join().unwrap();
         info!("Total time elapsed: {}s", now.elapsed().as_secs());
     })
 }

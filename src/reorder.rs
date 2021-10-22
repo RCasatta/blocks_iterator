@@ -6,14 +6,19 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
+use std::thread::JoinHandle;
 use std::time::Instant;
 
 pub struct Reorder {
-    receiver: Receiver<Option<Vec<FsBlock>>>,
-    sender: SyncSender<Option<BlockExtra>>,
-    height: u32,
-    next: BlockHash,
-    blocks: OutOfOrderBlocks,
+    join: Option<JoinHandle<()>>,
+}
+
+impl Drop for Reorder {
+    fn drop(&mut self) {
+        if let Some(jh) = self.join.take() {
+            jh.join().expect("thread failed");
+        }
+    }
 }
 
 struct OutOfOrderBlocks {
@@ -89,84 +94,78 @@ impl Reorder {
         max_reorg: u8,
         receiver: Receiver<Option<Vec<FsBlock>>>,
         sender: SyncSender<Option<BlockExtra>>,
-    ) -> Reorder {
-        Reorder {
-            sender,
-            receiver,
-            height: 0,
-            next: genesis_block(network).block_hash(),
-            blocks: OutOfOrderBlocks::new(max_reorg),
-        }
-    }
+    ) -> Self {
+        let mut next = genesis_block(network).block_hash();
+        let mut blocks = OutOfOrderBlocks::new(max_reorg);
+        let mut height = 0;
+        Self {
+            join: Some(std::thread::spawn(move || {
+                let mut busy_time = 0u128;
+                let mut count = 0u32;
+                let mut now = Instant::now();
+                let mut last_height = 0;
+                loop {
+                    busy_time += now.elapsed().as_nanos();
+                    let received = receiver.recv().expect("cannot receive blob");
+                    now = Instant::now();
+                    match received {
+                        Some(raw_blocks) => {
+                            for raw_block in raw_blocks {
+                                log!(
+                                    periodic_log_level(count, 10_000),
+                                    "reorder receive:{} size:{} follows:{} next:{}",
+                                    raw_block.hash,
+                                    blocks.blocks.len(),
+                                    blocks.follows.len(),
+                                    next
+                                );
 
-    fn send(&mut self, mut block_extra: BlockExtra) {
-        self.next = block_extra.next[0];
-        block_extra.height = self.height;
-        self.blocks.follows.remove(&block_extra.block_hash);
-        self.blocks
-            .blocks
-            .remove(&block_extra.block.header.prev_blockhash);
-        self.sender.send(Some(block_extra)).unwrap();
-        self.height += 1;
-    }
+                                count += 1;
 
-    pub fn start(&mut self) {
-        let mut busy_time = 0u128;
-        let mut count = 0u32;
-        let mut now = Instant::now();
-        let mut last_height = 0;
-        loop {
-            busy_time += now.elapsed().as_nanos();
-            let received = self.receiver.recv().expect("cannot receive blob");
-            now = Instant::now();
-            match received {
-                Some(raw_blocks) => {
-                    for raw_block in raw_blocks {
-                        log!(
-                            periodic_log_level(count, 10_000),
-                            "reorder receive:{} size:{} follows:{} next:{}",
-                            raw_block.hash,
-                            self.blocks.blocks.len(),
-                            self.blocks.follows.len(),
-                            self.next
-                        );
-
-                        count += 1;
-
-                        // even tough should be 1024 -> https://github.com/bitcoin/bitcoin/search?q=BLOCK_DOWNLOAD_WINDOW
-                        // in practice it needs to be greater
-                        let max_block_to_reorder = 10_000;
-                        if self.blocks.blocks.len() > max_block_to_reorder {
-                            for block in self.blocks.blocks.values() {
-                                println!("{} {:?}", block.hash, block.next);
+                                // even tough should be 1024 -> https://github.com/bitcoin/bitcoin/search?q=BLOCK_DOWNLOAD_WINDOW
+                                // in practice it needs to be greater
+                                let max_block_to_reorder = 10_000;
+                                if blocks.blocks.len() > max_block_to_reorder {
+                                    for block in blocks.blocks.values() {
+                                        println!("{} {:?}", block.hash, block.next);
+                                    }
+                                    println!("next: {}", next);
+                                    panic!("Reorder map grow more than {}", max_block_to_reorder);
+                                }
+                                blocks.add(raw_block);
+                                while let Some(block_to_send) = blocks.remove(&next) {
+                                    let mut block_extra: BlockExtra =
+                                        block_to_send.try_into().unwrap();
+                                    busy_time += now.elapsed().as_nanos();
+                                    next = block_extra.next[0];
+                                    block_extra.height = height;
+                                    blocks.follows.remove(&block_extra.block_hash);
+                                    blocks
+                                        .blocks
+                                        .remove(&block_extra.block.header.prev_blockhash);
+                                    sender.send(Some(block_extra)).unwrap();
+                                    height += 1;
+                                    now = Instant::now();
+                                    last_height = height;
+                                }
                             }
-                            println!("next: {}", self.next);
-                            panic!("Reorder map grow more than {}", max_block_to_reorder);
                         }
-                        self.blocks.add(raw_block);
-                        while let Some(block_to_send) = self.blocks.remove(&self.next) {
-                            let block_extra: BlockExtra = block_to_send.try_into().unwrap();
-                            busy_time += now.elapsed().as_nanos();
-                            self.send(block_extra);
-                            now = Instant::now();
-                            last_height = self.height;
-                        }
+                        None => break,
                     }
                 }
-                None => break,
-            }
+                info!(
+                    "ending reorder next:{} #elements:{} #follows:{}",
+                    next,
+                    blocks.blocks.len(),
+                    blocks.follows.len()
+                );
+                info!(
+                    "ending reorder, busy time: {}s, last height: {}",
+                    busy_time / 1_000_000_000,
+                    last_height
+                );
+                sender.send(None).expect("reorder cannot send none");
+            })),
         }
-        info!(
-            "ending reorder next:{} #elements:{} #follows:{}",
-            self.next,
-            self.blocks.blocks.len(),
-            self.blocks.follows.len()
-        );
-        info!(
-            "ending reorder, busy time: {}s, last height: {}",
-            busy_time / 1_000_000_000,
-            last_height
-        );
-        self.sender.send(None).expect("reorder cannot send none");
     }
 }

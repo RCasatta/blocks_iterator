@@ -19,7 +19,9 @@ pub struct ReadDetect {
 
 impl Drop for ReadDetect {
     fn drop(&mut self) {
-        self.join.take().map(|j| j.join().expect("thread failed"));
+        if let Some(jh) = self.join.take() {
+            jh.join().expect("thread failed");
+        }
     }
 }
 
