@@ -10,13 +10,17 @@ use std::io::{BufReader, Read, Seek};
 use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
 use std::time::Instant;
 
 pub struct ReadDetect {
-    blocks_dir: PathBuf,
-    seen: Seen,
-    network: Network,
-    sender: SyncSender<Option<Vec<FsBlock>>>,
+    join: Option<JoinHandle<()>>,
+}
+
+impl Drop for ReadDetect {
+    fn drop(&mut self) {
+        self.join.take().map(|j| j.join().expect("thread failed"));
+    }
 }
 
 /// Save half memory in comparison to using directly HashSet<BlockHash> while providing enough
@@ -58,60 +62,56 @@ impl ReadDetect {
         network: Network,
         sender: SyncSender<Option<Vec<FsBlock>>>,
     ) -> Self {
-        ReadDetect {
-            blocks_dir,
-            sender,
-            seen: Seen::new(),
-            network,
+        Self {
+            join: Some(std::thread::spawn(move || {
+                let mut now = Instant::now();
+                let mut seen = Seen::new();
+                let mut path = blocks_dir.clone();
+                path.push("blk*.dat");
+                info!("listing block files at {:?}", path);
+                let mut paths: Vec<PathBuf> = glob::glob(path.to_str().unwrap())
+                    .unwrap()
+                    .map(|r| r.unwrap())
+                    .collect();
+                paths.sort();
+                info!("There are {} block files", paths.len());
+                let mut busy_time = 0u128;
+
+                for (count, path) in paths.into_iter().enumerate() {
+                    let file = File::open(&path).unwrap();
+                    let mut reader = BufReader::new(file);
+                    let detected_blocks = detect(&mut reader, network.magic()).unwrap();
+                    drop(reader);
+
+                    let file = File::open(&path).unwrap();
+                    let file = Arc::new(Mutex::new(file));
+
+                    let fs_blocks: Vec<_> = detected_blocks
+                        .into_iter()
+                        .filter(|e| seen.insert(&e.hash))
+                        .map(|e| e.into_fs_block(&file))
+                        .collect();
+
+                    // TODO if 0 blocks found, maybe wrong directory
+
+                    log!(
+                        periodic_log_level(count as u32, 100),
+                        "read {:?}, contains {} blocks",
+                        &path,
+                        fs_blocks.len()
+                    );
+
+                    busy_time += now.elapsed().as_nanos();
+                    sender.send(Some(fs_blocks)).expect("cannot send");
+                    now = Instant::now();
+                }
+                info!(
+                    "ending reader parse , busy time: {}s",
+                    (busy_time / 1_000_000_000)
+                );
+                sender.send(None).expect("cannot send");
+            })),
         }
-    }
-
-    pub fn start(&mut self) {
-        let mut now = Instant::now();
-        let mut path = self.blocks_dir.clone();
-        path.push("blk*.dat");
-        info!("listing block files at {:?}", path);
-        let mut paths: Vec<PathBuf> = glob::glob(path.to_str().unwrap())
-            .unwrap()
-            .map(|r| r.unwrap())
-            .collect();
-        paths.sort();
-        info!("There are {} block files", paths.len());
-        let mut busy_time = 0u128;
-
-        for (count, path) in paths.into_iter().enumerate() {
-            let file = File::open(&path).unwrap();
-            let mut reader = BufReader::new(file);
-            let detected_blocks = detect(&mut reader, self.network.magic()).unwrap();
-            drop(reader);
-
-            let file = File::open(&path).unwrap();
-            let file = Arc::new(Mutex::new(file));
-
-            let fs_blocks: Vec<_> = detected_blocks
-                .into_iter()
-                .filter(|e| self.seen.insert(&e.hash))
-                .map(|e| e.into_fs_block(&file))
-                .collect();
-
-            // TODO if 0 blocks found, maybe wrong directory
-
-            log!(
-                periodic_log_level(count as u32, 100),
-                "read {:?}, contains {} blocks",
-                &path,
-                fs_blocks.len()
-            );
-
-            busy_time += now.elapsed().as_nanos();
-            self.sender.send(Some(fs_blocks)).expect("cannot send");
-            now = Instant::now();
-        }
-        info!(
-            "ending reader parse , busy time: {}s",
-            (busy_time / 1_000_000_000)
-        );
-        self.sender.send(None).expect("cannot send");
     }
 }
 
