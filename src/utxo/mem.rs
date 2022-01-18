@@ -88,7 +88,7 @@ enum StackScript {
     //V0Wsh(WScriptHash),  // with this sizeof would grow to 40
     P2Pkh(PubkeyHash),
     P2Sh(ScriptHash),
-    V0Wpkh(WPubkeyHash),
+    P2V0Wpkh(WPubkeyHash),
     Other(Script),
 }
 
@@ -108,7 +108,7 @@ impl From<&Script> for StackScript {
         } else if script.is_p2sh() {
             StackScript::P2Sh(ScriptHash::from_slice(&script[2..22]).unwrap())
         } else if script.is_v0_p2wpkh() {
-            StackScript::V0Wpkh(WPubkeyHash::from_slice(&script[2..22]).unwrap())
+            StackScript::P2V0Wpkh(WPubkeyHash::from_slice(&script[2..22]).unwrap())
         } else {
             StackScript::Other(script.clone())
         }
@@ -121,7 +121,7 @@ impl From<StackScript> for Script {
             StackScript::Other(script) => script,
             StackScript::P2Pkh(h) => Script::new_p2pkh(&h),
             StackScript::P2Sh(h) => Script::new_p2sh(&h),
-            StackScript::V0Wpkh(h) => Script::new_v0_wpkh(&h),
+            StackScript::P2V0Wpkh(h) => Script::new_v0_p2wpkh(&h),
         }
     }
 }
@@ -240,8 +240,8 @@ mod test {
         assert_eq!(stack_script, StackScript::P2Sh(hash));
 
         let hash = WPubkeyHash::from_slice(&[7u8; 20]).unwrap();
-        let script = Script::new_v0_wpkh(&hash);
+        let script = Script::new_v0_p2wpkh(&hash);
         let stack_script: StackScript = (&script).into();
-        assert_eq!(stack_script, StackScript::V0Wpkh(hash));
+        assert_eq!(stack_script, StackScript::P2V0Wpkh(hash));
     }
 }
