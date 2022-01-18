@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use bitcoin::consensus::{deserialize, encode, Decodable};
-use bitcoin::SigHashType;
+use bitcoin::EcdsaSighashType;
 use blocks_iterator::{Config, PeriodCounter};
 use env_logger::Env;
 use log::info;
@@ -58,13 +58,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 struct ParsedSignature {
-    pub _sighash: SigHashType,
+    pub _sighash: EcdsaSighashType,
     pub _R: Vec<u8>,
     pub _s: Vec<u8>,
 }
 
 impl Decodable for ParsedSignature {
     fn consensus_decode<D: std::io::Read>(mut d: D) -> Result<Self, encode::Error> {
+        //TODO fix for schnorr signatures!
         let first = u8::consensus_decode(&mut d)?;
         if first != 0x30 {
             return Err(encode::Error::ParseFailed("Signature must start with 0x30"));
@@ -82,7 +83,7 @@ impl Decodable for ParsedSignature {
         }
         let s = <Vec<u8>>::consensus_decode(&mut d)?;
         let sighash_u8 = u8::consensus_decode(&mut d)?;
-        let sighash = SigHashType::from_u32_consensus(sighash_u8 as u32);
+        let sighash = EcdsaSighashType::from_consensus(sighash_u8 as u32);
 
         Ok(ParsedSignature {
             _sighash: sighash,
