@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         for tx in block_extra.block.txdata {
             for input in tx.input {
-                for witness in input.witness {
+                for witness in input.witness.iter() {
                     if let Ok(_sig) = deserialize::<ParsedSignature>(&witness) {
                         signatures_in_witness += 1;
                         block_with_witness = true;
