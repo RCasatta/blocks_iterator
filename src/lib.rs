@@ -154,11 +154,7 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
         );
 
         if !config.skip_prevout {
-            let mut fee = fee::Fee::new(receive_ordered_blocks, channel, config.utxo_manager());
-            let fee_handle = thread::spawn(move || {
-                fee.start();
-            });
-            fee_handle.join().unwrap();
+            let _fee = fee::Fee::new(receive_ordered_blocks, channel, config.utxo_manager());
         }
 
         info!("Total time elapsed: {}s", now.elapsed().as_secs());
@@ -309,6 +305,28 @@ mod bench {
             let mut result = [0u8; 12];
             result.copy_from_slice(&hash[..12]);
             black_box(result);
+        });
+    }
+
+    #[bench]
+    fn bench_bitcoin_hashes_sha_long(b: &mut Bencher) {
+        let a: Vec<_> = (0u8..255).cycle().take(1000).collect();
+        b.iter(|| {
+            let mut engine = sha256::Hash::engine();
+            engine.input(&a);
+            let hash = sha256::Hash::from_engine(engine);
+            black_box(hash);
+        });
+    }
+
+    #[bench]
+    fn bench_sha2_crate_long(b: &mut Bencher) {
+        let a: Vec<_> = (0u8..255).cycle().take(1000).collect();
+        b.iter(|| {
+            let mut hasher = Sha256::new();
+            hasher.update(&a);
+            let hash = hasher.finalize();
+            black_box(hash);
         });
     }
 
