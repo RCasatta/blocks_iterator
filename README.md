@@ -45,9 +45,12 @@ Run examples with:
 cargo run --release --example verify
 ```
 
-* [heaviest](examples/heaviest_pipe) find the transaction with greatest weight
-* [most_output](examples/most_output_pipe) find the transaction with most output
-* [verify](examples/verify.rs) verify transactions
+* [heaviest](examples/heaviest_pipe.rs) find the transaction with greatest weight
+* [most_output](examples/most_output_pipe.rs) find the transaction with most output
+* [outputs_versions](examples/outputs_versions.rs) Count outputs witness version
+* [signatures_in_witness](examples/signatures_in_witness.rs) Count signatures in witness
+* [verify](examples/verify.rs) verify transactions in blocks using libbitcoin-consensus
+
 
 ## Similar projects
 
