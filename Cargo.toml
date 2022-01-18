@@ -11,7 +11,7 @@ readme = "README.md"
 license = "MIT"
 
 [dependencies]
-bitcoin = "0.27"
+bitcoin = "0.28.0-rc.1"
 structopt = "0.3.21"
 log = "0.4.11"
 glob = "0.3.0"
