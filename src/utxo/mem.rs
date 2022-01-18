@@ -182,13 +182,8 @@ impl TruncMap {
     }
 }
 
+#[derive(Default)]
 struct PassthroughHasher(u64);
-
-impl Default for PassthroughHasher {
-    fn default() -> Self {
-        PassthroughHasher(0)
-    }
-}
 
 impl BuildHasher for PassthroughHasher {
     type Hasher = PassthroughHasher;
