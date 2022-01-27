@@ -92,7 +92,8 @@ impl UtxoStore for DbUtxo {
                         }
                         None => {
                             let key = input.previous_output.to_key(&self.salt);
-                            let tx_out = deserialize(&self.db.get(&key).unwrap().unwrap()).unwrap();
+                            let tx_out =
+                                deserialize(&self.db.get_pinned(&key).unwrap().unwrap()).unwrap();
                             batch.delete(&key);
                             prevouts.push(tx_out);
                         }
