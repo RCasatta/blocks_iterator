@@ -108,12 +108,14 @@ impl UtxoStore for DbUtxo {
             batch.put(height.to_ne_bytes(), serialize(&prevouts));
             batch.put(UPDATED_UP_TO_HEIGHT, height.to_ne_bytes());
             self.db.write(batch).unwrap(); // TODO unwrap
+            prevouts
+        } else {
+            self.db
+                .get(height.to_ne_bytes())
+                .unwrap()
+                .map(|e| deserialize(&e).unwrap())
+                .unwrap()
         }
-        self.db
-            .get(height.to_ne_bytes())
-            .unwrap()
-            .map(|e| deserialize(&e).unwrap())
-            .unwrap()
     }
 
     fn stat(&self) -> String {
