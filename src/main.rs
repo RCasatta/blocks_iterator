@@ -1,11 +1,12 @@
 use blocks_iterator::bitcoin::consensus::serialize;
-use blocks_iterator::{periodic_log_level, Config};
+use blocks_iterator::{Config, PeriodCounter};
 use env_logger::Env;
-use log::{info, log};
+use log::info;
 use std::error::Error;
 use std::io;
 use std::io::Write;
 use std::sync::mpsc::sync_channel;
+use std::time::Duration;
 use structopt::StructOpt;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -15,14 +16,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::from_args();
     let (send, recv) = sync_channel(config.channels_size.into());
     let handle = blocks_iterator::iterate(config, send);
+    let mut bench = PeriodCounter::new(Duration::from_secs(10));
+
     while let Some(block_extra) = recv.recv()? {
-        log!(
-            periodic_log_level(block_extra.height, 10_000),
-            "# {:7} {} {:?}",
-            block_extra.height,
-            block_extra.block_hash,
-            block_extra.fee()
-        );
+        bench.count_block(&block_extra.block);
+        if let Some(stats) = bench.period_elapsed() {
+            info!(
+                "# {:7} {} {:?}",
+                block_extra.height,
+                block_extra.block_hash,
+                block_extra.fee()
+            );
+            info!("{}", stats);
+        }
+
         let ser = serialize(&block_extra);
         io::stdout().write_all(&ser)?;
     }
