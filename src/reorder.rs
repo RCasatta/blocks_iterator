@@ -1,13 +1,13 @@
-use crate::{periodic_log_level, BlockExtra, FsBlock};
+use crate::{BlockExtra, FsBlock, Periodic};
 use bitcoin::blockdata::constants::genesis_block;
 use bitcoin::{BlockHash, Network};
-use log::{info, log, warn};
+use log::{info, warn};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub struct Reorder {
     join: Option<JoinHandle<()>>,
@@ -98,10 +98,10 @@ impl Reorder {
         let mut next = genesis_block(network).block_hash();
         let mut blocks = OutOfOrderBlocks::new(max_reorg);
         let mut height = 0;
+        let mut periodic = Periodic::new(Duration::from_secs(60));
         Self {
             join: Some(std::thread::spawn(move || {
                 let mut busy_time = 0u128;
-                let mut count = 0u32;
                 let mut now = Instant::now();
                 let mut last_height = 0;
                 loop {
@@ -111,16 +111,15 @@ impl Reorder {
                     match received {
                         Some(raw_blocks) => {
                             for raw_block in raw_blocks {
-                                log!(
-                                    periodic_log_level(count, 10_000),
-                                    "reorder receive:{} size:{} follows:{} next:{}",
-                                    raw_block.hash,
-                                    blocks.blocks.len(),
-                                    blocks.follows.len(),
-                                    next
-                                );
-
-                                count += 1;
+                                if periodic.elapsed() {
+                                    info!(
+                                        "reorder receive:{} size:{} follows:{} next:{}",
+                                        raw_block.hash,
+                                        blocks.blocks.len(),
+                                        blocks.follows.len(),
+                                        next
+                                    );
+                                }
 
                                 // even tough should be 1024 -> https://github.com/bitcoin/bitcoin/search?q=BLOCK_DOWNLOAD_WINDOW
                                 // in practice it needs to be greater

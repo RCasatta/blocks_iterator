@@ -27,7 +27,7 @@ use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use structopt::StructOpt;
 use utxo::AnyUtxo;
 
@@ -165,11 +165,34 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
 }
 
 /// Utility method usually returning [log::Level::Debug] but when `i` is divisible by `every` returns [log::Level::Info]
+#[deprecated]
 pub fn periodic_log_level(i: u32, every: u32) -> Level {
     if i % every == 0 {
         Level::Info
     } else {
         Level::Debug
+    }
+}
+
+/// Utility used to return true after `period`
+pub struct Periodic {
+    last: Instant,
+    period: Duration,
+}
+impl Periodic {
+    fn new(period: Duration) -> Self {
+        Periodic {
+            last: Instant::now(),
+            period,
+        }
+    }
+    fn elapsed(&mut self) -> bool {
+        if self.last.elapsed() > self.period {
+            self.last = Instant::now();
+            true
+        } else {
+            false
+        }
     }
 }
 

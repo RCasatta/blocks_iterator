@@ -1,11 +1,11 @@
 use crate::utxo::UtxoStore;
-use crate::BlockExtra;
+use crate::{BlockExtra, Periodic};
 use bitcoin::{OutPoint, Script, TxOut};
 use log::{debug, info, trace};
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub struct Fee {
     join: Option<JoinHandle<()>>,
@@ -32,6 +32,7 @@ impl Fee {
                 let mut busy_time = 0u128;
                 let mut total_txs = 0u64;
                 let mut last_height = 0;
+                let mut periodic = Periodic::new(Duration::from_secs(60));
                 loop {
                     busy_time += now.elapsed().as_nanos();
                     let received = receiver.recv().unwrap();
@@ -42,7 +43,7 @@ impl Fee {
                             trace!("fee received: {}", block_extra.block_hash);
                             total_txs += block_extra.block.txdata.len() as u64;
 
-                            if block_extra.height % 10_000 == 0 {
+                            if periodic.elapsed() {
                                 info!("{}", utxo.stat());
                             }
 

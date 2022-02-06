@@ -1,8 +1,8 @@
 use crate::bitcoin::consensus::Decodable;
 use crate::bitcoin::{Block, BlockHash, Network};
-use crate::{periodic_log_level, FsBlock};
+use crate::{FsBlock, Periodic};
 use bitcoin::Error;
-use log::{error, info, log};
+use log::{error, info};
 use std::collections::HashSet;
 use std::convert::TryInto;
 use std::fs::File;
@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub struct ReadDetect {
     join: Option<JoinHandle<()>>,
@@ -64,6 +64,7 @@ impl ReadDetect {
         network: Network,
         sender: SyncSender<Option<Vec<FsBlock>>>,
     ) -> Self {
+        let mut periodic = Periodic::new(Duration::from_secs(60));
         Self {
             join: Some(std::thread::spawn(move || {
                 let mut now = Instant::now();
@@ -79,7 +80,7 @@ impl ReadDetect {
                 info!("There are {} block files", paths.len());
                 let mut busy_time = 0u128;
 
-                for (count, path) in paths.into_iter().enumerate() {
+                for path in paths.into_iter() {
                     let file = File::open(&path).unwrap();
                     let mut reader = BufReader::new(file);
                     let detected_blocks = detect(&mut reader, network.magic()).unwrap();
@@ -95,13 +96,9 @@ impl ReadDetect {
                         .collect();
 
                     // TODO if 0 blocks found, maybe wrong directory
-
-                    log!(
-                        periodic_log_level(count as u32, 100),
-                        "read {:?}, contains {} blocks",
-                        &path,
-                        fs_blocks.len()
-                    );
+                    if periodic.elapsed() {
+                        info!("read {:?}, contains {} blocks", &path, fs_blocks.len());
+                    }
 
                     busy_time += now.elapsed().as_nanos();
                     sender.send(Some(fs_blocks)).expect("cannot send");
