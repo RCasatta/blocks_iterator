@@ -27,15 +27,15 @@ use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use structopt::StructOpt;
 use utxo::AnyUtxo;
 
-pub use bench::PeriodCounter;
+pub use period::{PeriodCounter, Periodic};
 
-mod bench;
 mod block_extra;
 mod fee;
+mod period;
 mod pipe;
 mod read_detect;
 mod reorder;
@@ -171,28 +171,6 @@ pub fn periodic_log_level(i: u32, every: u32) -> Level {
         Level::Info
     } else {
         Level::Debug
-    }
-}
-
-/// Utility used to return true after `period`
-pub struct Periodic {
-    last: Instant,
-    period: Duration,
-}
-impl Periodic {
-    fn new(period: Duration) -> Self {
-        Periodic {
-            last: Instant::now(),
-            period,
-        }
-    }
-    fn elapsed(&mut self) -> bool {
-        if self.last.elapsed() > self.period {
-            self.last = Instant::now();
-            true
-        } else {
-            false
-        }
     }
 }
 

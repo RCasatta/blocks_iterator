@@ -82,3 +82,27 @@ impl fmt::Display for Stats {
         )
     }
 }
+
+/// Utility used to return true after `period`
+pub struct Periodic {
+    last: Instant,
+    period: Duration,
+}
+impl Periodic {
+    /// Create [`Periodic`]
+    pub fn new(period: Duration) -> Self {
+        Periodic {
+            last: Instant::now(),
+            period,
+        }
+    }
+    /// Returns `true` if `self.period` elapsed from last time
+    pub fn elapsed(&mut self) -> bool {
+        if self.last.elapsed() > self.period {
+            self.last = Instant::now();
+            true
+        } else {
+            false
+        }
+    }
+}
