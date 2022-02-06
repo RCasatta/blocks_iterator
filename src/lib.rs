@@ -31,6 +31,9 @@ use std::time::Instant;
 use structopt::StructOpt;
 use utxo::AnyUtxo;
 
+pub use bench::PeriodCounter;
+
+mod bench;
 mod block_extra;
 mod fee;
 mod pipe;
