@@ -82,6 +82,10 @@ pub struct Config {
     /// Reduce the memory requirements but it's slower and use disk space
     #[structopt(short, long)]
     pub utxo_db: Option<PathBuf>,
+
+    /// Save positions of blocks in blocks*.dat files to skip reading from disk
+    #[structopt(short, long)]
+    pub detected_blocks_cache: PathBuf,
 }
 
 impl Config {
@@ -138,8 +142,12 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
 
         // FsBlock is a small struct (~120b), so 10_000 is not a problem but allows the read_detect to read ahead the next block file
         let (send_block_fs, receive_block_fs) = sync_channel(0);
-        let _read =
-            read_detect::ReadDetect::new(config.blocks_dir.clone(), config.network, send_block_fs);
+        let _read = read_detect::ReadDetect::new(
+            config.blocks_dir.clone(),
+            config.detected_blocks_cache.clone(),
+            config.network,
+            send_block_fs,
+        );
 
         let (send_ordered_blocks, receive_ordered_blocks) =
             sync_channel(config.channels_size.into());

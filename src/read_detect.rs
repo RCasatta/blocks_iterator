@@ -1,12 +1,13 @@
 use crate::bitcoin::consensus::Decodable;
-use crate::bitcoin::{Block, BlockHash, Network};
+use crate::bitcoin::{BlockHash, Network};
 use crate::{FsBlock, Periodic};
-use bitcoin::Error;
-use log::{error, info};
-use std::collections::HashSet;
+use bitcoin::{BlockHeader, Error, Transaction};
+use log::{error, info, warn};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::fs::File;
-use std::io::{BufReader, Read, Seek};
+use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
@@ -38,6 +39,7 @@ impl Seen {
     }
 }
 
+#[derive(Clone, Serialize, Deserialize)]
 pub struct DetectedBlock {
     start: usize,
     end: usize,
@@ -61,12 +63,24 @@ impl DetectedBlock {
 impl ReadDetect {
     pub fn new(
         blocks_dir: PathBuf,
+        detected_blocks_cache: PathBuf,
         network: Network,
         sender: SyncSender<Option<Vec<FsBlock>>>,
     ) -> Self {
-        let mut periodic = Periodic::new(Duration::from_secs(60));
         Self {
             join: Some(std::thread::spawn(move || {
+                let mut periodic = Periodic::new(Duration::from_secs(60));
+                let mut detected_cache: HashMap<BlockHash, DetectedBlock> =
+                    match File::open(&detected_blocks_cache) {
+                        Ok(file) => {
+                            serde_cbor::from_reader(BufReader::new(file)).unwrap_or_default()
+                        }
+                        Err(_) => {
+                            warn!("detected cache not found");
+                            HashMap::default()
+                        }
+                    };
+
                 let mut now = Instant::now();
                 let mut seen = Seen::new();
                 let mut path = blocks_dir.clone();
@@ -83,7 +97,8 @@ impl ReadDetect {
                 for path in paths.into_iter() {
                     let file = File::open(&path).unwrap();
                     let mut reader = BufReader::new(file);
-                    let detected_blocks = detect(&mut reader, network.magic()).unwrap();
+                    let detected_blocks =
+                        detect(&mut reader, network.magic(), &mut detected_cache).unwrap();
                     drop(reader);
 
                     let file = File::open(&path).unwrap();
@@ -104,6 +119,12 @@ impl ReadDetect {
                     sender.send(Some(fs_blocks)).expect("cannot send");
                     now = Instant::now();
                 }
+
+                serde_cbor::to_writer(
+                    File::create(&detected_blocks_cache).unwrap(),
+                    &detected_cache,
+                )
+                .unwrap();
                 info!(
                     "ending reader parse , busy time: {}s",
                     (busy_time / 1_000_000_000)
@@ -114,7 +135,11 @@ impl ReadDetect {
     }
 }
 
-pub fn detect<R: Read + Seek>(mut reader: &mut R, magic: u32) -> Result<Vec<DetectedBlock>, Error> {
+pub fn detect<R: Read + Seek>(
+    mut reader: &mut R,
+    magic: u32,
+    detected_cache: &mut HashMap<BlockHash, DetectedBlock>,
+) -> Result<Vec<DetectedBlock>, Error> {
     let mut rolling = RollingU32::default();
 
     // Instead of sending DetecetdBlock on the channel directly, we quickly insert in the vector
@@ -134,18 +159,36 @@ pub fn detect<R: Read + Seek>(mut reader: &mut R, magic: u32) -> Result<Vec<Dete
         };
         let size = u32::consensus_decode(&mut reader)?;
         let start = reader.stream_position().unwrap() as usize;
-        match Block::consensus_decode(&mut reader) {
-            Ok(block) => {
-                let end = reader.stream_position().unwrap() as usize;
-                assert_eq!(size as usize, end - start);
-                let hash = block.header.block_hash();
-                let detected_block = DetectedBlock {
-                    start,
-                    end,
-                    hash,
-                    prev: block.header.prev_blockhash,
-                };
-                detected_blocks.push(detected_block);
+        match BlockHeader::consensus_decode(&mut reader) {
+            Ok(block_header) => {
+                let block_hash = block_header.block_hash();
+                match detected_cache.get(&block_hash) {
+                    Some(detected_block) => {
+                        reader
+                            .seek(SeekFrom::Current(
+                                (detected_block.end - detected_block.start - 80) as i64,
+                            ))
+                            .unwrap(); // TODO remove unwrap
+                        detected_blocks.push(detected_block.clone());
+                    }
+                    None => match Vec::<Transaction>::consensus_decode(&mut reader) {
+                        Ok(_) => {
+                            let end = reader.stream_position().unwrap() as usize;
+                            assert_eq!(size as usize, end - start);
+                            let detected_block = DetectedBlock {
+                                start,
+                                end,
+                                hash: block_hash,
+                                prev: block_header.prev_blockhash,
+                            };
+                            detected_cache.insert(block_hash, detected_block.clone());
+                            detected_blocks.push(detected_block);
+                        }
+                        Err(e) => {
+                            error!("error block parsing {:?}", e)
+                        }
+                    },
+                }
             }
             Err(e) => {
                 // It's mandatory to use stream_position (require MSRV 1.51) because I can't maintain
