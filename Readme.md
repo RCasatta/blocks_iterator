@@ -24,7 +24,11 @@ $ ./target/release/blocks_iterator --blocks-dir /Volumes/Transcend/bitcoin-testn
 
 ## Memory requirements and performance
 
-Running [iterate](examples/iterate.rs) example on threadripper 1950X, Testnet @ 2090k, Mainnet @ 705k. Spinning disk.
+Running [main](src/main.rs) executable on threadripper 1950X, Testnet @ 2090k, Mainnet @ 705k. Spinning disk.
+
+```
+cargo run --release >/dev/null
+```
 
 | Network | `--skip--prevout` | `--max-reorg` | `utxo-db` | Memory | Time    |
 |---------|-------------------|---------------|----------:|-------:|--------:|
@@ -42,10 +46,9 @@ Running [iterate](examples/iterate.rs) example on threadripper 1950X, Testnet @ 
 Run examples with:
 
 ```
-cargo run --release --example iterate
+cargo run --release --example verify
 ```
 
-* [iterate](examples/iterate.rs) iterate over blocks and print block fee
 * [heaviest](examples/heaviest_pipe) find the transaction with greatest weight
 * [most_output](examples/most_output_pipe) find the transaction with most output
 * [verify](examples/verify.rs) verify transactions
