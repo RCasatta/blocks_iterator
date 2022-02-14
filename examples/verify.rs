@@ -1,15 +1,16 @@
 use bitcoin::consensus::{deserialize, serialize};
 use bitcoin::{Amount, Script, Transaction};
 use bitcoinconsensus::height_to_flags;
-use blocks_iterator::{periodic_log_level, Config};
+use blocks_iterator::{Config, PeriodCounter};
 use env_logger::Env;
-use log::{error, info, log};
+use log::{error, info};
 use rayon::prelude::*;
 use std::error::Error;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 use structopt::StructOpt;
 
 const BATCH: usize = 10_000;
@@ -30,6 +31,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::from_args();
     let (send, recv) = sync_channel(config.channels_size.into());
     let (send_script, recv_script) = sync_channel(config.channels_size.into());
+    let mut period = PeriodCounter::new(Duration::from_secs(10));
 
     let handle = blocks_iterator::iterate(config, send);
 
@@ -71,13 +73,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     });
 
     while let Some(mut block_extra) = recv.recv()? {
-        log!(
-            periodic_log_level(block_extra.height, 10_000),
-            "# {:7} {} {:?}",
-            block_extra.height,
-            block_extra.block_hash,
-            block_extra.fee()
-        );
+        if period.period_elapsed().is_some() {
+            info!(
+                "# {:7} {} {:?}",
+                block_extra.height,
+                block_extra.block_hash,
+                block_extra.fee()
+            );
+        }
         for tx in block_extra.block.txdata.iter().skip(1) {
             let tx_bytes = serialize(tx);
             let arc_tx_bytes = Arc::new(tx_bytes);

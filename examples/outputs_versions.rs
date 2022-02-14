@@ -1,18 +1,19 @@
 #![allow(non_snake_case)]
 
-use blocks_iterator::periodic_log_level;
-use blocks_iterator::Config;
+use blocks_iterator::{Config, PeriodCounter};
 use env_logger::Env;
-use log::{info, log};
+use log::info;
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::sync::mpsc::sync_channel;
+use std::time::Duration;
 use structopt::StructOpt;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     info!("start");
+    let mut period = PeriodCounter::new(Duration::from_secs(10));
 
     let mut config = Config::from_args();
     config.skip_prevout = true;
@@ -21,13 +22,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut counters = [0usize; 17];
     let mut output_file = File::create("outputs_versions.log").unwrap();
     while let Some(block_extra) = recv.recv()? {
-        log!(
-            periodic_log_level(block_extra.height, 10_000),
-            "# {:7} {} counters:{:?}",
-            block_extra.height,
-            block_extra.block_hash,
-            counters
-        );
+        if period.period_elapsed().is_some() {
+            info!(
+                "# {:7} {} counters:{:?}",
+                block_extra.height, block_extra.block_hash, counters
+            );
+        }
 
         if block_extra.height == 481824 {
             info!("segwit locked in");

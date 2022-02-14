@@ -2,12 +2,12 @@
 
 use bitcoin::consensus::{deserialize, encode, Decodable};
 use bitcoin::SigHashType;
-use blocks_iterator::periodic_log_level;
-use blocks_iterator::Config;
+use blocks_iterator::{Config, PeriodCounter};
 use env_logger::Env;
-use log::{info, log};
+use log::info;
 use std::error::Error;
 use std::sync::mpsc::sync_channel;
+use std::time::Duration;
 use structopt::StructOpt;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -20,17 +20,20 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut signatures_in_witness = 0;
     let mut block_with_witness;
     let mut blocks_with_witness = 0;
+    let mut period = PeriodCounter::new(Duration::from_secs(10));
+
     while let Some(block_extra) = recv.recv()? {
         block_with_witness = false;
-        log!(
-            periodic_log_level(block_extra.height, 10_000),
-            "# {:7} {} {:?} sig_wit:{} blk_wit:{}",
-            block_extra.height,
-            block_extra.block_hash,
-            block_extra.fee(),
-            signatures_in_witness,
-            blocks_with_witness
-        );
+        if period.period_elapsed().is_some() {
+            info!(
+                "# {:7} {} {:?} sig_wit:{} blk_wit:{}",
+                block_extra.height,
+                block_extra.block_hash,
+                block_extra.fee(),
+                signatures_in_witness,
+                blocks_with_witness
+            );
+        }
 
         for tx in block_extra.block.txdata {
             for input in tx.input {

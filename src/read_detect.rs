@@ -1,7 +1,7 @@
 use crate::bitcoin::consensus::Decodable;
-use crate::bitcoin::{Block, BlockHash, Network};
+use crate::bitcoin::{BlockHash, Network};
 use crate::{FsBlock, Periodic};
-use bitcoin::Error;
+use bitcoin::{BlockHeader, Error, Transaction, VarInt};
 use log::{error, info};
 use std::collections::HashSet;
 use std::convert::TryInto;
@@ -134,16 +134,29 @@ pub fn detect<R: Read + Seek>(mut reader: &mut R, magic: u32) -> Result<Vec<Dete
         };
         let size = u32::consensus_decode(&mut reader)?;
         let start = reader.stream_position().unwrap() as usize;
-        match Block::consensus_decode(&mut reader) {
-            Ok(block) => {
+        match BlockHeader::consensus_decode(&mut reader) {
+            Ok(block_header) => {
+                // Instead of parsing a block which is unneeded at this stage
+                // we just seek over transactions to avoid full Block allocation
+                let n_txs = match VarInt::consensus_decode(&mut reader) {
+                    Ok(v) => v.0,
+                    Err(_) => continue,
+                };
+                for _ in 0..n_txs {
+                    if Transaction::consensus_decode(&mut reader).is_err() {
+                        continue;
+                    }
+                }
                 let end = reader.stream_position().unwrap() as usize;
-                assert_eq!(size as usize, end - start);
-                let hash = block.header.block_hash();
+                if size as usize != end - start {
+                    continue;
+                }
+                let hash = block_header.block_hash();
                 let detected_block = DetectedBlock {
                     start,
                     end,
                     hash,
-                    prev: block.header.prev_blockhash,
+                    prev: block_header.prev_blockhash,
                 };
                 detected_blocks.push(detected_block);
             }
@@ -151,7 +164,7 @@ pub fn detect<R: Read + Seek>(mut reader: &mut R, magic: u32) -> Result<Vec<Dete
                 // It's mandatory to use stream_position (require MSRV 1.51) because I can't maintain
                 // a byte read position because in case of error I don't know how many bytes of the
                 // reader has been consumed
-                error!("error block parsing {:?}", e)
+                error!("error block header parsing {:?}", e)
             }
         }
     }
