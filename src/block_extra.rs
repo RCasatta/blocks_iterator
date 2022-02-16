@@ -77,6 +77,13 @@ impl BlockExtra {
         }
         Some(input_total - output_total)
     }
+
+    /// return the base block reward in satoshi
+    pub fn base_reward(&self) -> u64 {
+        let initial = 50 * 100_000_000u64;
+        let division = self.height as u64 / 210_000u64;
+        initial >> division
+    }
 }
 
 impl Encodable for BlockExtra {
@@ -129,7 +136,14 @@ mod test {
 
     #[test]
     fn block_extra_round_trip() {
-        let be = BlockExtra {
+        let be = block_extra();
+        let ser = serialize(&be);
+        let deser = deserialize(&ser).unwrap();
+        assert_eq!(be, deser);
+    }
+
+    fn block_extra() -> BlockExtra {
+        BlockExtra {
             block: Block {
                 header: BlockHeader {
                     version: 0,
@@ -150,9 +164,20 @@ mod test {
                 m.insert(OutPoint::default(), TxOut::default());
                 m
             },
-        };
-        let ser = serialize(&be);
-        let deser = deserialize(&ser).unwrap();
-        assert_eq!(be, deser);
+        }
+    }
+
+    #[test]
+    fn test_block_reward() {
+        let mut be = block_extra();
+        assert_eq!(be.base_reward(), 50 * 100_000_000);
+        be.height = 209_999;
+        assert_eq!(be.base_reward(), 50 * 100_000_000);
+        be.height = 210_000;
+        assert_eq!(be.base_reward(), 25 * 100_000_000);
+        be.height = 420_000;
+        assert_eq!(be.base_reward(), 1_250_000_000);
+        be.height = 630_000;
+        assert_eq!(be.base_reward(), 625_000_000);
     }
 }
