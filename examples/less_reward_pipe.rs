@@ -8,7 +8,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     info!("start");
 
-    let iter = PipeIterator::new(io::stdin(), io::stdout());
+    let iter = PipeIterator::new(io::stdin(), Some(io::stdout()));
     let mut total_missing_reward = 0u64;
     let mut blocks_missing_reward = 0u64;
 

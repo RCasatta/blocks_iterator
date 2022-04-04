@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut most_output: (Txid, usize) = (Txid::default(), 0);
 
-    let iter = PipeIterator::new(io::stdin(), io::stdout());
+    let iter = PipeIterator::new(io::stdin(), Some(io::stdout()));
 
     for block_extra in iter {
         for tx in block_extra.block.txdata.iter() {
