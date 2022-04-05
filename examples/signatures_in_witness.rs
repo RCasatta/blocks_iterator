@@ -83,7 +83,7 @@ impl Decodable for ParsedSignature {
         }
         let s = <Vec<u8>>::consensus_decode(&mut d)?;
         let sighash_u8 = u8::consensus_decode(&mut d)?;
-        let sighash = EcdsaSigHashType::from_u32_consensus(sighash_u8 as u32);
+        let sighash = EcdsaSigHashType::from_consensus(sighash_u8 as u32);
 
         Ok(ParsedSignature {
             _sighash: sighash,

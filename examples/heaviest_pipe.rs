@@ -15,10 +15,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for block_extra in iter {
         for tx in block_extra.block.txdata.iter() {
-            if tx.get_weight() > heaviest.1 {
+            if tx.weight() > heaviest.1 {
                 let txid = tx.txid();
                 info!("New heaviest tx: {}", txid);
-                heaviest = (txid, tx.get_weight());
+                heaviest = (txid, tx.weight());
             }
         }
     }
