@@ -1,4 +1,5 @@
-use blocks_iterator::bitcoin::consensus::serialize;
+use bitcoin::consensus::encode::MAX_VEC_SIZE;
+use bitcoin::consensus::Encodable;
 use blocks_iterator::{Config, PeriodCounter};
 use env_logger::Env;
 use log::info;
@@ -17,7 +18,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (send, recv) = sync_channel(config.channels_size.into());
     let handle = blocks_iterator::iterate(config, send);
     let mut bench = PeriodCounter::new(Duration::from_secs(10));
-
+    let mut buffer = [0u8; MAX_VEC_SIZE];
     while let Some(block_extra) = recv.recv()? {
         bench.count_block(&block_extra.block);
         if let Some(stats) = bench.period_elapsed() {
@@ -29,9 +30,8 @@ fn main() -> Result<(), Box<dyn Error>> {
             );
             info!("{}", stats);
         }
-
-        let ser = serialize(&block_extra);
-        io::stdout().write_all(&ser)?;
+        let size = block_extra.consensus_encode(&mut buffer[..]).unwrap();
+        io::stdout().write_all(&buffer[..size])?;
     }
     handle.join().expect("couldn't join");
     info!("end");
