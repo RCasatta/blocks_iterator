@@ -2,7 +2,7 @@ use crate::bitcoin::consensus::serialize;
 use crate::bitcoin::hashes::{sha256, Hash, HashEngine};
 use crate::bitcoin::{Block, OutPoint, TxOut};
 use crate::utxo::UtxoStore;
-use bitcoin::consensus::deserialize;
+use bitcoin::consensus::{deserialize, Encodable};
 use log::{debug, info};
 use rand::Rng;
 use rocksdb::{DBCompressionType, Options, WriteBatch, DB};
@@ -17,6 +17,7 @@ pub struct DbUtxo {
     updated_up_to_height: i32,
     inserted_outputs: u64,
     salt: Key,
+    script_buffer: [u8; 10_000],
 }
 
 const SALT: &'static str = "salt";
@@ -54,6 +55,7 @@ impl DbUtxo {
             updated_up_to_height,
             inserted_outputs: 0,
             salt,
+            script_buffer: [0u8; 10_000],
         })
     }
 }
@@ -103,7 +105,8 @@ impl UtxoStore for DbUtxo {
 
             // and we put all the remaining outputs in db
             for (k, v) in block_outputs.drain() {
-                batch.put(&k.to_key(&self.salt), serialize(v));
+                let script_len = v.consensus_encode(&mut self.script_buffer[..]).unwrap();
+                batch.put(&k.to_key(&self.salt), &self.script_buffer[..script_len]);
                 self.inserted_outputs += 1;
             }
             batch.put(height.to_ne_bytes(), serialize(&prevouts));
