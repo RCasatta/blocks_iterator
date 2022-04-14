@@ -4,8 +4,10 @@ use bitcoin::{BlockHash, Network};
 use log::{info, warn};
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
+use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -92,6 +94,8 @@ impl Reorder {
     pub fn new(
         network: Network,
         max_reorg: u8,
+        stop_at_height: Option<u32>,
+        early_stop: Arc<AtomicBool>,
         receiver: Receiver<Option<Vec<FsBlock>>>,
         sender: SyncSender<Option<BlockExtra>>,
     ) -> Self {
@@ -110,7 +114,10 @@ impl Reorder {
                     now = Instant::now();
                     match received {
                         Some(raw_blocks) => {
-                            for raw_block in raw_blocks {
+                            if early_stop.load(Ordering::SeqCst) {
+                                break;
+                            }
+                            'outer: for raw_block in raw_blocks {
                                 if periodic.elapsed() {
                                     info!(
                                         "reorder receive:{} size:{} follows:{} next:{}",
@@ -146,6 +153,13 @@ impl Reorder {
                                     height += 1;
                                     now = Instant::now();
                                     last_height = height;
+                                    if let Some(stop_at_height) = stop_at_height {
+                                        if height > stop_at_height {
+                                            info!("reached height: {}", stop_at_height);
+                                            early_stop.store(true, Ordering::Relaxed);
+                                            break 'outer;
+                                        }
+                                    }
                                 }
                             }
                         }

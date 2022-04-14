@@ -23,6 +23,7 @@ use log::{info, Level};
 use std::fs::File;
 
 use std::path::PathBuf;
+use std::sync::atomic::AtomicBool;
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -82,6 +83,10 @@ pub struct Config {
     /// Reduce the memory requirements but it's slower and use disk space
     #[structopt(short, long)]
     pub utxo_db: Option<PathBuf>,
+
+    /// Stop the blocks iteration at the specified height
+    #[structopt(short, long)]
+    pub stop_at_height: Option<u32>,
 }
 
 impl Config {
@@ -135,11 +140,16 @@ pub struct FsBlock {
 pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {
     thread::spawn(move || {
         let now = Instant::now();
+        let early_stop = Arc::new(AtomicBool::new(false));
 
         // FsBlock is a small struct (~120b), so 10_000 is not a problem but allows the read_detect to read ahead the next block file
         let (send_block_fs, receive_block_fs) = sync_channel(0);
-        let _read =
-            read_detect::ReadDetect::new(config.blocks_dir.clone(), config.network, send_block_fs);
+        let _read = read_detect::ReadDetect::new(
+            config.blocks_dir.clone(),
+            config.network,
+            early_stop.clone(),
+            send_block_fs,
+        );
 
         let (send_ordered_blocks, receive_ordered_blocks) =
             sync_channel(config.channels_size.into());
@@ -152,6 +162,8 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
         let _reorder = reorder::Reorder::new(
             config.network,
             config.max_reorg,
+            config.stop_at_height,
+            early_stop.clone(),
             receive_block_fs,
             send_ordered_blocks,
         );
@@ -190,6 +202,7 @@ mod inner_test {
             channels_size: 0,
             #[cfg(feature = "db")]
             utxo_db: None,
+            stop_at_height: None,
         };
         let (send, recv) = sync_channel(0);
 
@@ -212,6 +225,7 @@ mod inner_test {
             skip_prevout: false,
             max_reorg: 10,
             channels_size: 0,
+            stop_at_height: None,
             utxo_db: Some(tempdir.path().to_path_buf()),
         };
         let (send, recv) = sync_channel(0);
