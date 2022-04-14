@@ -1,26 +1,22 @@
 use crate::bitcoin::consensus::serialize;
-use crate::bitcoin::hashes::{sha256, Hash, HashEngine};
 use crate::bitcoin::{Block, OutPoint, TxOut};
 use crate::utxo::UtxoStore;
 use bitcoin::consensus::{deserialize, Encodable};
 use log::{debug, info};
-use rand::Rng;
 use rocksdb::{DBCompressionType, Options, WriteBatch, DB};
 use std::collections::HashMap;
 use std::convert::TryInto;
 use std::path::Path;
 
-type Key = [u8; 12];
-
 pub struct DbUtxo {
     db: DB,
     updated_up_to_height: i32,
     inserted_outputs: u64,
-    salt: Key,
     script_buffer: [u8; 10_000],
+    outpoint_buffer: [u8; 36],
 }
+// use column family to separate things in the db
 
-const SALT: &'static str = "salt";
 const UPDATED_UP_TO_HEIGHT: &'static str = "updated_up_to_height";
 
 impl DbUtxo {
@@ -36,26 +32,14 @@ impl DbUtxo {
             .map(|e| i32::from_ne_bytes(e))
             .unwrap_or(-1);
 
-        let salt: Option<Key> = db.get(SALT)?.map(|e| e.try_into().unwrap());
-        let salt = match salt {
-            Some(salt) => salt,
-            None => {
-                let salt = rand::thread_rng().gen::<Key>();
-                db.put(SALT, &salt)?;
-                salt
-            }
-        };
-        info!(
-            "using salt: {:?} updated_height: {}",
-            salt, updated_up_to_height
-        );
+        info!("DB updated_height: {}", updated_up_to_height);
 
         Ok(DbUtxo {
             db,
             updated_up_to_height,
             inserted_outputs: 0,
-            salt,
             script_buffer: [0u8; 10_000],
+            outpoint_buffer: [0u8; 36],
         })
     }
 }
@@ -93,10 +77,15 @@ impl UtxoStore for DbUtxo {
                             prevouts.push(tx_out.clone())
                         }
                         None => {
-                            let key = input.previous_output.to_key(&self.salt);
-                            let tx_out =
-                                deserialize(&self.db.get_pinned(&key).unwrap().unwrap()).unwrap();
-                            batch.delete(&key);
+                            input
+                                .previous_output
+                                .consensus_encode(&mut self.outpoint_buffer[..])
+                                .unwrap();
+                            let tx_out = deserialize(
+                                &self.db.get_pinned(&self.outpoint_buffer).unwrap().unwrap(),
+                            )
+                            .unwrap();
+                            batch.delete(&self.outpoint_buffer);
                             prevouts.push(tx_out);
                         }
                     }
@@ -105,8 +94,9 @@ impl UtxoStore for DbUtxo {
 
             // and we put all the remaining outputs in db
             for (k, v) in block_outputs.drain() {
+                k.consensus_encode(&mut self.outpoint_buffer[..]).unwrap();
                 let script_len = v.consensus_encode(&mut self.script_buffer[..]).unwrap();
-                batch.put(&k.to_key(&self.salt), &self.script_buffer[..script_len]);
+                batch.put(&self.outpoint_buffer[..], &self.script_buffer[..script_len]);
                 self.inserted_outputs += 1;
             }
             batch.put(height.to_ne_bytes(), serialize(&prevouts));
@@ -127,39 +117,6 @@ impl UtxoStore for DbUtxo {
             "updated_up_to_height: {} inserted_outputs: {}",
             self.updated_up_to_height, self.inserted_outputs
         )
-    }
-}
-
-trait ToKey<T: AsRef<[u8]>> {
-    fn to_key(&self, salt: &T) -> T;
-}
-
-impl ToKey<Key> for OutPoint {
-    fn to_key(&self, salt: &Key) -> Key {
-        let mut engine = sha256::HashEngine::default();
-        engine.input(&salt[..]);
-        engine.input(&self.txid.as_ref());
-        engine.input(&self.vout.to_ne_bytes()[..]);
-        let hash = sha256::Hash::from_engine(engine);
-        let mut result = [0u8; 12];
-        result.copy_from_slice(&hash.into_inner()[..12]);
-        result
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::utxo::db::ToKey;
-    use bitcoin::OutPoint;
-
-    #[test]
-    fn test_key_hash() {
-        let mut outpoint = OutPoint::default();
-        outpoint.vout = 0;
-        let salt = [1u8; 12];
-        let before = outpoint.to_key(&salt);
-        outpoint.vout = 1;
-        assert_ne!(&outpoint.to_key(&salt), &before);
     }
 }
 
