@@ -8,6 +8,7 @@ use std::convert::TryInto;
 use std::fs::File;
 use std::io::{BufReader, Read, Seek};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::SyncSender;
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -62,6 +63,7 @@ impl ReadDetect {
     pub fn new(
         blocks_dir: PathBuf,
         network: Network,
+        early_stop: Arc<AtomicBool>,
         sender: SyncSender<Option<Vec<FsBlock>>>,
     ) -> Self {
         let mut periodic = Periodic::new(Duration::from_secs(60));
@@ -101,14 +103,21 @@ impl ReadDetect {
                     }
 
                     busy_time += now.elapsed().as_nanos();
-                    sender.send(Some(fs_blocks)).expect("cannot send");
+                    if early_stop.load(Ordering::Relaxed) {
+                        break;
+                    } else {
+                        sender.send(Some(fs_blocks)).expect("cannot send");
+                    }
+
                     now = Instant::now();
                 }
                 info!(
                     "ending reader parse , busy time: {}s",
                     (busy_time / 1_000_000_000)
                 );
-                sender.send(None).expect("cannot send");
+                if !early_stop.load(Ordering::Relaxed) {
+                    sender.send(None).expect("cannot send");
+                }
             })),
         }
     }
