@@ -15,13 +15,13 @@ pub struct DbUtxo {
 }
 
 /// This prefix contains currently unspent transaction outputs.
-const UTXO_PREFIX: u8 = 'U' as u8;
+const UTXO_PREFIX: u8 = b'U';
 
 /// This prefix contains all prevouts of a given block.
-const PREVOUTS_PREFIX: u8 = 'P' as u8;
+const PREVOUTS_PREFIX: u8 = b'P';
 
 /// This prefix contains the height meanint the db updated up to this.
-const HEIGHT_PREFIX: u8 = 'H' as u8;
+const HEIGHT_PREFIX: u8 = b'H';
 
 impl DbUtxo {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<DbUtxo, rocksdb::Error> {
@@ -32,7 +32,7 @@ impl DbUtxo {
         let updated_up_to_height = db
             .get(&[HEIGHT_PREFIX])?
             .map(|e| e.try_into().unwrap())
-            .map(|e| i32::from_ne_bytes(e))
+            .map(i32::from_ne_bytes)
             .unwrap_or(-1);
 
         info!("DB updated_height: {}", updated_up_to_height);

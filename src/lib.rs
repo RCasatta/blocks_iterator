@@ -163,7 +163,7 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
             config.network,
             config.max_reorg,
             config.stop_at_height,
-            early_stop.clone(),
+            early_stop,
             receive_block_fs,
             send_ordered_blocks,
         );
