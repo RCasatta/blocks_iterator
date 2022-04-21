@@ -128,16 +128,24 @@ impl UtxoStore for DbUtxo {
                 }
                 self.inserted_outputs += 1;
             }
-            batch.put(serialize_prevouts_height(height), serialize(&prevouts)); // TODO consider compress this value
+            if !prevouts.is_empty() {
+                // TODO consider compress this value serialized prevouts
+                batch.put(serialize_prevouts_height(height), serialize(&prevouts));
+            }
             batch.put(&[HEIGHT_PREFIX], height.to_ne_bytes());
             self.db.write(batch).unwrap(); // TODO unwrap
             prevouts
         } else {
-            self.db
-                .get(serialize_prevouts_height(height))
-                .unwrap()
-                .map(|e| deserialize(&e).unwrap())
-                .unwrap()
+            if block.txdata.len() == 1 {
+                // avoid hitting disk when we have only the coinbase (no prevouts!)
+                Vec::new()
+            } else {
+                self.db
+                    .get_pinned(serialize_prevouts_height(height))
+                    .unwrap()
+                    .map(|e| deserialize(&e).unwrap())
+                    .unwrap()
+            }
         }
     }
 
