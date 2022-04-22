@@ -13,8 +13,6 @@ use std::thread;
 use std::time::Duration;
 use structopt::StructOpt;
 
-const BATCH: usize = 10_000;
-
 #[derive(Debug)]
 struct VerifyData {
     script_pubkey: Script,
@@ -29,28 +27,17 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("start");
 
     let config = Config::from_args();
-    let (send, recv) = sync_channel(config.channels_size.into());
     let (send_script, recv_script) = sync_channel(config.channels_size.into());
     let mut period = PeriodCounter::new(Duration::from_secs(10));
 
-    let handle = blocks_iterator::iterate(config, send);
+    let iter = blocks_iterator::iter(config);
 
     let process_handle = thread::spawn(move || {
         let error_count = AtomicUsize::new(0);
-        let mut buffer: Vec<VerifyData> = Vec::with_capacity(BATCH);
-        let mut last = false;
-        loop {
-            for _ in 0..BATCH {
-                match recv_script.recv().unwrap() {
-                    Some(data) => buffer.push(data),
-                    None => {
-                        last = true;
-                        break;
-                    }
-                }
-            }
-
-            buffer.par_iter().for_each(|data| {
+        recv_script
+            .into_iter()
+            .par_bridge()
+            .for_each(|data: VerifyData| {
                 if let Err(e) = data.script_pubkey.verify_with_flags(
                     data.index,
                     data.amount,
@@ -63,16 +50,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                     error!("tx: {}", tx.txid());
                     error_count.fetch_add(1, Ordering::SeqCst);
                 }
-            });
-            if last {
-                break;
-            }
-            buffer.clear();
-        }
-        info!("errors: {:?}", error_count);
+            })
     });
 
-    while let Some(mut block_extra) = recv.recv()? {
+    for mut block_extra in iter {
         if period.period_elapsed().is_some() {
             info!(
                 "# {:7} {} {:?}",
@@ -96,13 +77,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                     spending: arc_tx_bytes.clone(),
                     flags: height_to_flags(block_extra.height),
                 };
-                send_script.send(Some(data))?;
+                send_script.send(data)?;
             }
         }
     }
-    send_script.send(None)?;
+    drop(send_script);
     process_handle.join().expect("couldn't join");
-    handle.join().expect("couldn't join");
 
     Ok(())
 }
