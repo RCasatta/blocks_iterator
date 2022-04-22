@@ -171,6 +171,46 @@ pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
     BlockExtraIterator { handle, recv }
 }
 
+#[cfg(feature = "parallel")]
+/// Parallelized iterator
+pub fn par_iter<T: 'static + Send, S: 'static + Send + Sync>(
+    config: Config,
+    pre_processing: impl Fn(BlockExtra) -> Vec<T> + 'static + Send,
+    task: impl Fn(T, Arc<S>) -> bool + 'static + Send + Sync,
+    state: S,
+) {
+    use rayon::prelude::*;
+    use std::sync::atomic::Ordering::SeqCst;
+
+    let (send_task, recv_task) = sync_channel::<T>(config.channels_size.into());
+    let stop = Arc::new(AtomicBool::new(false));
+    let state = Arc::new(state);
+
+    {
+        let stop = stop.clone();
+        thread::spawn(move || {
+            let mut iter = iter(config);
+            for block_extra in iter.next() {
+                if stop.load(SeqCst) {
+                    break;
+                }
+                let data_vec = pre_processing(block_extra);
+                for data in data_vec {
+                    send_task.send(data).unwrap();
+                }
+            }
+        });
+    }
+
+    recv_task.into_iter().par_bridge().for_each(|data: T| {
+        let result = task(data, state.clone());
+
+        if result {
+            stop.store(true, SeqCst)
+        }
+    });
+}
+
 fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {
     thread::spawn(move || {
         let now = Instant::now();
