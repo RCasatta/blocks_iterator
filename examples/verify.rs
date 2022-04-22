@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let state = AtomicUsize::new(0);
 
-    blocks_iterator::par_iter(config, pre_processing, task, state);
+    blocks_iterator::par_iter(config, state, pre_processing, task);
 
     Ok(())
 }

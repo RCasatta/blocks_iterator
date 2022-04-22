@@ -173,17 +173,22 @@ pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
 
 #[cfg(feature = "parallel")]
 /// Parallelized iterator
-pub fn par_iter<T: 'static + Send, S: 'static + Send + Sync>(
+pub fn par_iter<STATE, PREPROC, TASK, DATA>(
     config: Config,
-    pre_processing: impl Fn(BlockExtra) -> Vec<T> + 'static + Send,
-    task: impl Fn(T, Arc<S>) -> bool + 'static + Send + Sync,
-    state: S,
-) {
+    state: STATE,
+    pre_processing: PREPROC,
+    task: TASK,
+) where
+    PREPROC: Fn(BlockExtra) -> Vec<DATA> + 'static + Send,
+    TASK: Fn(DATA, Arc<STATE>) -> bool + 'static + Send + Sync,
+    DATA: 'static + Send,
+    STATE: 'static + Send + Sync,
+{
     use log::debug;
     use rayon::prelude::*;
     use std::sync::atomic::Ordering::SeqCst;
 
-    let (send_task, recv_task) = sync_channel::<T>(config.channels_size.into());
+    let (send_task, recv_task) = sync_channel(config.channels_size.into());
     let stop = Arc::new(AtomicBool::new(false));
     let state = Arc::new(state);
 
@@ -204,7 +209,7 @@ pub fn par_iter<T: 'static + Send, S: 'static + Send + Sync>(
         debug!("ending pre-processing thread");
     });
 
-    recv_task.into_iter().par_bridge().for_each(|data: T| {
+    recv_task.into_iter().par_bridge().for_each(|data: DATA| {
         debug!("iter");
         let result = task(data, state.clone());
 
