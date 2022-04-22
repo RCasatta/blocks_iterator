@@ -19,12 +19,12 @@
 extern crate test;
 
 use bitcoin::BlockHash;
-use log::{info, Level};
+use log::{error, info, Level};
 use std::fs::File;
 
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
-use std::sync::mpsc::{sync_channel, SyncSender};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
@@ -133,11 +133,45 @@ pub struct FsBlock {
     pub next: Vec<BlockHash>,
 }
 
-/// Read `blocks*.dat` contained in the `config.blocks_dir` directory and returns [BlockExtra]
-/// through a channel supplied from the caller. Blocks returned are ordered from the genesis to the
-/// highest block in the directory (minus `config.max_reorg`).
-/// In this call threads are spawned, caller must call [std::thread::JoinHandle::join] on the returning handle.
-pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {
+struct BlockExtraIterator {
+    handle: Option<JoinHandle<()>>,
+    recv: Receiver<Option<BlockExtra>>,
+}
+impl Iterator for BlockExtraIterator {
+    type Item = BlockExtra;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.recv.recv() {
+            Ok(Some(val)) => Some(val),
+            Ok(None) => {
+                if let Some(handle) = self.handle.take() {
+                    handle.join().unwrap();
+                }
+                None
+            }
+            Err(e) => {
+                error!("error iterating {:?}", e);
+                if let Some(handle) = self.handle.take() {
+                    handle.join().unwrap();
+                }
+                None
+            }
+        }
+    }
+}
+
+/// Return an Iterator of [`BlockExtra`] read from `blocks*.dat` contained in the `config.blocks_dir`
+/// Blocks returned are ordered from the genesis to the highest block in the directory
+/// (minus `config.max_reorg`).
+pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
+    let (send, recv) = sync_channel(config.channels_size.into());
+
+    let handle = Some(iterate(config, send));
+
+    BlockExtraIterator { handle, recv }
+}
+
+fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {
     thread::spawn(move || {
         let now = Instant::now();
         let early_stop = Arc::new(AtomicBool::new(false));

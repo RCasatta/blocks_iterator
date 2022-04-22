@@ -6,7 +6,6 @@ use blocks_iterator::{Config, PeriodCounter};
 use env_logger::Env;
 use log::info;
 use std::error::Error;
-use std::sync::mpsc::sync_channel;
 use std::time::Duration;
 use structopt::StructOpt;
 
@@ -15,14 +14,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("start");
 
     let config = Config::from_args();
-    let (send, recv) = sync_channel(config.channels_size.into());
-    let handle = blocks_iterator::iterate(config, send);
+    let iter = blocks_iterator::iter(config);
     let mut signatures_in_witness = 0;
     let mut block_with_witness;
     let mut blocks_with_witness = 0;
     let mut period = PeriodCounter::new(Duration::from_secs(10));
 
-    while let Some(block_extra) = recv.recv()? {
+    for block_extra in iter {
         block_with_witness = false;
         if period.period_elapsed().is_some() {
             info!(
@@ -49,7 +47,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             blocks_with_witness += 1;
         }
     }
-    handle.join().expect("couldn't join");
     info!(
         "signatures_in_witness: {} blocks_with_witness: {}",
         signatures_in_witness, blocks_with_witness

@@ -6,7 +6,6 @@ use log::info;
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
-use std::sync::mpsc::sync_channel;
 use std::time::Duration;
 use structopt::StructOpt;
 
@@ -17,11 +16,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut config = Config::from_args();
     config.skip_prevout = true;
-    let (send, recv) = sync_channel(config.channels_size.into());
-    let handle = blocks_iterator::iterate(config, send);
+    let iter = blocks_iterator::iter(config);
     let mut counters = [0usize; 17];
     let mut output_file = File::create("outputs_versions.log").unwrap();
-    while let Some(block_extra) = recv.recv()? {
+    for block_extra in iter {
         if period.period_elapsed().is_some() {
             info!(
                 "# {:7} {} counters:{:?}",
@@ -60,7 +58,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-    handle.join().expect("couldn't join");
     info!("counters: {:?}", counters);
     Ok(())
 }

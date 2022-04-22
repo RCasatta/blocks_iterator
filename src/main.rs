@@ -6,7 +6,6 @@ use log::info;
 use std::error::Error;
 use std::io;
 use std::io::Write;
-use std::sync::mpsc::sync_channel;
 use std::time::Duration;
 use structopt::StructOpt;
 
@@ -15,11 +14,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("start");
 
     let config = Config::from_args();
-    let (send, recv) = sync_channel(config.channels_size.into());
-    let handle = blocks_iterator::iterate(config, send);
+    let blocks_iter = blocks_iterator::iter(config);
     let mut bench = PeriodCounter::new(Duration::from_secs(10));
     let mut buffer = [0u8; MAX_VEC_SIZE];
-    while let Some(block_extra) = recv.recv()? {
+    for block_extra in blocks_iter {
         bench.count_block(&block_extra.block);
         if let Some(stats) = bench.period_elapsed() {
             info!(
@@ -33,7 +31,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         let size = block_extra.consensus_encode(&mut buffer[..]).unwrap();
         io::stdout().write_all(&buffer[..size])?;
     }
-    handle.join().expect("couldn't join");
     info!("end");
     Ok(())
 }
