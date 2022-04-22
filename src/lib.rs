@@ -179,6 +179,7 @@ pub fn par_iter<T: 'static + Send, S: 'static + Send + Sync>(
     task: impl Fn(T, Arc<S>) -> bool + 'static + Send + Sync,
     state: S,
 ) {
+    use log::debug;
     use rayon::prelude::*;
     use std::sync::atomic::Ordering::SeqCst;
 
@@ -186,29 +187,32 @@ pub fn par_iter<T: 'static + Send, S: 'static + Send + Sync>(
     let stop = Arc::new(AtomicBool::new(false));
     let state = Arc::new(state);
 
-    {
-        let stop = stop.clone();
-        thread::spawn(move || {
-            let mut iter = iter(config);
-            for block_extra in iter.next() {
-                if stop.load(SeqCst) {
-                    break;
-                }
-                let data_vec = pre_processing(block_extra);
-                for data in data_vec {
-                    send_task.send(data).unwrap();
-                }
+    let stop_clone = stop.clone();
+    let iter = iter(config);
+
+    let handle = thread::spawn(move || {
+        debug!("start pre-processing thread");
+        for block_extra in iter {
+            if stop_clone.load(SeqCst) {
+                break;
             }
-        });
-    }
+            let data_vec = pre_processing(block_extra);
+            for data in data_vec {
+                send_task.send(data).unwrap();
+            }
+        }
+        debug!("ending pre-processing thread");
+    });
 
     recv_task.into_iter().par_bridge().for_each(|data: T| {
+        debug!("iter");
         let result = task(data, state.clone());
 
         if result {
             stop.store(true, SeqCst)
         }
     });
+    handle.join().unwrap();
 }
 
 fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {
