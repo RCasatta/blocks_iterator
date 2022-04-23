@@ -6,7 +6,7 @@ use std::io::Write;
 const MAX_BLOCK_EXTRA_SIZE: usize = 10 * 1024 * 1024;
 
 /// Iterator to use un Unix-style pipe composition when receiving BlockExtra from stdin and
-/// propogating those to stdout
+/// optionally propogating those to stdout
 pub struct PipeIterator {
     stdin: io::Stdin, // from docs, stdin is buffered, non need to wrap in BufReader
     stdout: Option<io::Stdout>,

@@ -9,7 +9,16 @@ Features:
 * Blocks are returned in height order, it avoids following reorgs (see `max_reorg` parameter)
 * Blocks come with [metadata](https://docs.rs/blocks_iterator/latest/blocks_iterator/struct.BlockExtra.html) like all block's previous outputs, it allows computing transactions fee or [verifying](examples/verify.rs) scripts in the blockchain.
 
-# Pipes
+## Iteration modes
+
+### In rust programs
+
+Used as a library blocks could be iterated:
+
+* via the [`blocks_iterator::iter`](https://docs.rs/blocks_iterator/latest/blocks_iterator/fn.iter.html) method like done in [outputs_versions](examples/outputs_versions.rs) example
+* via the [`blocks_iterator::par_iter`](https://docs.rs/blocks_iterator/latest/blocks_iterator/fn.par_iter.html) method like done in [verify](examples/verify.rs) example. `par_iter` is preferred when the task to be perforemd is computational costly.
+
+### Through Pipes
 
 Other than inside Rust programs, ordered blocks with prevouts could be iterated using Unix pipes.
 
