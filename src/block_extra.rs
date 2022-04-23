@@ -8,7 +8,7 @@ use std::convert::TryFrom;
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::ops::DerefMut;
 
-/// The bitcoin block and additional metadata returned by the [iterate] method
+/// The bitcoin block and additional metadata returned by the [crate::iter] method
 #[derive(Debug, Eq, PartialEq)]
 pub struct BlockExtra {
     /// The bitcoin block
@@ -18,7 +18,7 @@ pub struct BlockExtra {
     /// The byte size of the block, as returned by in `serialize(block).len()`
     pub size: u32,
     /// Hash of the blocks following this one, it's a vec because during reordering they may be more
-    /// than one because of reorgs, as a result from [iterate], it's just one.
+    /// than one because of reorgs, as a result from the iteration, it's just one.
     pub next: Vec<BlockHash>,
     /// The height of the current block, number of blocks between this one and the genesis block
     pub height: u32,

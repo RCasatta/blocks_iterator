@@ -3,6 +3,11 @@
 //! Read bitcoin blocks directory containing `blocks*.dat` files, and produce a ordered stream
 //! of [BlockExtra]
 //!
+//! Blocks could be consumed in 2 different ways:
+//! * Through the [`iter`] or [`par_iter`] method. The latter is to be preferred when performing
+//!   costly task.
+//! * Via unix pipeline using the [`PipeIterator`]
+//!
 
 // Coding conventions
 #![forbid(unsafe_code)]
@@ -105,8 +110,9 @@ impl Config {
 
 /// Before reorder we keep only the position of the block in the file system and data relative
 /// to the block hash, the previous hash and the following hash (populated during reorder phase)
-/// We will need to read the block from disk again, but by doing so we will avoid using too much
-/// memory in the [`OutOfOrderBlocks`] map.
+/// We will need
+///  to read the block from disk again, but by doing so we will avoid using too much
+/// memory in the `OutOfOrderBlocks` map.
 #[derive(Debug)]
 pub struct FsBlock {
     /// the file the block identified by `hash` is stored in. Multiple blocks are stored in the
@@ -161,8 +167,8 @@ impl Iterator for BlockExtraIterator {
 }
 
 /// Return an Iterator of [`BlockExtra`] read from `blocks*.dat` contained in the `config.blocks_dir`
-/// Blocks returned are ordered from the genesis to the highest block in the directory
-/// (minus `config.max_reorg`).
+/// Blocks returned are iterated in order, starting from the genesis to the highest block
+/// (minus `config.max_reorg`) in the directory, unless `config.stop_at_height` is specified.
 pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
     let (send, recv) = sync_channel(config.channels_size.into());
 
@@ -172,7 +178,17 @@ pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
 }
 
 #[cfg(feature = "parallel")]
-/// Parallelized iterator
+/// `par_iter` is used when the task to be performed on the blockchain is more costly
+/// than iterating the blocks. For example verifying the spending conditions in the blockchain.
+/// like [`crate::iter`] accepts configuration parameters via the [`Config`] struct.
+/// A `PREPROC` closure has to be provided, this process a single block and produce a Vec of
+/// user defined struct `DATA`.
+/// A `TASK` closure accepts the `DATA` struct and a shared `STATE` and it is executed in a
+/// concurrent way. The `TASK` closure returns a bool which indicates if the execution should be
+/// terminated.
+/// Note that access to `STATE` in `TASK` should be done carefully otherwise the contention would
+/// reduce the speed of execution.
+///  
 pub fn par_iter<STATE, PREPROC, TASK, DATA>(
     config: Config,
     state: STATE,
