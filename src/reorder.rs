@@ -1,4 +1,4 @@
-use crate::{BlockExtra, FsBlock, Periodic};
+use crate::{BlockExtra, FsBlock, PeriodCounter, Periodic};
 use bitcoin::blockdata::constants::genesis_block;
 use bitcoin::{BlockHash, Network};
 use log::{info, warn};
@@ -105,6 +105,8 @@ impl Reorder {
         let mut periodic = Periodic::new(Duration::from_secs(60));
         Self {
             join: Some(std::thread::spawn(move || {
+                let mut bench = PeriodCounter::new(Duration::from_secs(10));
+
                 let mut busy_time = 0u128;
                 let mut now = Instant::now();
                 let mut last_height = 0;
@@ -142,6 +144,7 @@ impl Reorder {
                                 while let Some(block_to_send) = blocks.remove(&next) {
                                     let mut block_extra: BlockExtra =
                                         block_to_send.try_into().unwrap();
+
                                     busy_time += now.elapsed().as_nanos();
                                     next = block_extra.next[0];
                                     block_extra.height = height;
@@ -149,6 +152,18 @@ impl Reorder {
                                     blocks
                                         .blocks
                                         .remove(&block_extra.block.header.prev_blockhash);
+
+                                    bench.count_block(&block_extra.block);
+                                    if let Some(stats) = bench.period_elapsed() {
+                                        info!(
+                                            "# {:7} {} {:?}",
+                                            block_extra.height,
+                                            block_extra.block_hash,
+                                            block_extra.fee()
+                                        );
+                                        info!("{}", stats);
+                                    }
+
                                     sender.send(Some(block_extra)).unwrap();
                                     height += 1;
                                     now = Instant::now();
