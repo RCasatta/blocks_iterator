@@ -191,7 +191,7 @@ pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
 ///  
 pub fn par_iter<STATE, PREPROC, TASK, DATA>(
     config: Config,
-    state: STATE,
+    state: Arc<STATE>,
     pre_processing: PREPROC,
     task: TASK,
 ) where
@@ -206,7 +206,6 @@ pub fn par_iter<STATE, PREPROC, TASK, DATA>(
 
     let (send_task, recv_task) = sync_channel(config.channels_size.into());
     let stop = Arc::new(AtomicBool::new(false));
-    let state = Arc::new(state);
 
     let stop_clone = stop.clone();
     let iter = iter(config);

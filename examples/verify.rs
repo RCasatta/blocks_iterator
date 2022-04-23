@@ -64,9 +64,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let config = Config::from_args();
 
-    let state = AtomicUsize::new(0);
+    let state = Arc::new(AtomicUsize::new(0));
 
-    blocks_iterator::par_iter(config, state, pre_processing, task);
+    blocks_iterator::par_iter(config, state.clone(), pre_processing, task);
+
+    info!("error count: {}", state.load(Ordering::SeqCst));
 
     Ok(())
 }

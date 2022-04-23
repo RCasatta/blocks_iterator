@@ -1,5 +1,12 @@
 # Changelog
 
+## Release 0.12.1 - 2022-04-23
+
+### Changed
+
+- `blocks_iterator::par_iter` accepts an `Arc<STATE>` instead of a `STATE` so it can be used after
+  the call
+
 ## Release 0.12.0 - 2022-04-23
 
 ### Added
