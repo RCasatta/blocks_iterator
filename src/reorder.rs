@@ -156,10 +156,8 @@ impl Reorder {
                                     bench.count_block(&block_extra.block);
                                     if let Some(stats) = bench.period_elapsed() {
                                         info!(
-                                            "# {:7} {} {:?}",
-                                            block_extra.height,
-                                            block_extra.block_hash,
-                                            block_extra.fee()
+                                            "# {:7} {}",
+                                            block_extra.height, block_extra.block_hash,
                                         );
                                         info!("{}", stats);
                                     }

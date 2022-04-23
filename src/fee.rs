@@ -43,10 +43,6 @@ impl Fee {
                             trace!("fee received: {}", block_extra.block_hash);
                             total_txs += block_extra.block.txdata.len() as u64;
 
-                            if periodic.elapsed() {
-                                info!("{}", utxo.stat());
-                            }
-
                             let mut prevouts =
                                 utxo.add_outputs_get_inputs(&block_extra.block, block_extra.height);
                             let mut prevouts = prevouts.drain(..);
@@ -72,6 +68,16 @@ impl Fee {
                                     value: coin_base_output_value,
                                 },
                             );
+
+                            if periodic.elapsed() {
+                                info!("{}", utxo.stat());
+                                info!(
+                                    "# {:7} {} fee: {:?}",
+                                    block_extra.height,
+                                    block_extra.block_hash,
+                                    block_extra.fee()
+                                );
+                            }
 
                             debug!(
                                 "#{:>6} {} size:{:>7} txs:{:>4} total_txs:{:>9} fee:{:?}",
