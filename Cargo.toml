@@ -48,7 +48,7 @@ name = "most_output_pipe"
 
 [[example]]
 name = "verify"
-required-features = ["verify"]
+required-features = ["consensus","parallel"]
 
 [[example]]
 name = "signatures_in_witness"
