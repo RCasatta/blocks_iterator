@@ -1,6 +1,6 @@
 [package]
 name = "blocks_iterator"
-version = "0.11.0"
+version = "0.12.0"
 authors = ["Riccardo Casatta <riccardo@casatta.it>"]
 edition = "2018"
 description = "Iterates Bitcoin blocks"
@@ -35,9 +35,9 @@ tempfile = "3.2.0"
 
 [features]
 default = ["db", "parallel", "consensus"]
+db = ["rocksdb", "rand"]
 parallel = ["rayon"]
 consensus = ["bitcoinconsensus", "bitcoin/bitcoinconsensus"]
-db = ["rocksdb", "rand"]
 unstable = ["sha2", "blake3"]
 
 [[example]]

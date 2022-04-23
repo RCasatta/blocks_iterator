@@ -14,3 +14,5 @@
 - By default all features are enabled, exclude default features to decrease building times
 - Increase MSRV to `1.56.1`
 - bitcoin dep increased to `0.28.0`
+- in `PipeIterator` streaming to stdout become optional, since it cost an additional serialization
+  that one could avoid by forking previous stdout with the unix `tee` command
