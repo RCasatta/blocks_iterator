@@ -197,10 +197,9 @@ mod inner_test {
     use crate::{iterate, Config};
     use std::sync::mpsc::sync_channel;
 
-    #[test]
-    fn test_blk_testnet() {
-        let conf = Config {
-            blocks_dir: "../blocks".into(),
+    fn test_conf() -> Config {
+        Config {
+            blocks_dir: "blocks".into(),
             network: Network::Testnet,
             skip_prevout: false,
             max_reorg: 10,
@@ -208,7 +207,14 @@ mod inner_test {
             #[cfg(feature = "db")]
             utxo_db: None,
             stop_at_height: None,
-        };
+        }
+    }
+
+    #[test]
+    fn test_blk_testnet() {
+        let _ = env_logger::try_init();
+
+        let conf = test_conf();
         let (send, recv) = sync_channel(0);
 
         let handle = iterate(conf, send);
@@ -223,16 +229,12 @@ mod inner_test {
     #[cfg(feature = "db")]
     #[test]
     fn test_blk_testnet_db() {
+        let _ = env_logger::try_init();
+
         let tempdir = tempfile::TempDir::new().unwrap();
-        let conf = Config {
-            blocks_dir: "../blocks".into(),
-            network: Network::Testnet,
-            skip_prevout: false,
-            max_reorg: 10,
-            channels_size: 0,
-            stop_at_height: None,
-            utxo_db: Some(tempdir.path().to_path_buf()),
-        };
+        let mut conf = test_conf();
+        conf.utxo_db = Some(tempdir.path().to_path_buf());
+
         let (send, recv) = sync_channel(0);
 
         let handle = iterate(conf.clone(), send);

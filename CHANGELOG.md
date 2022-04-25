@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Removed
+
+- `par_iter` is deprecated beacuse you can getter better composable results by simply concateneting
+  methods on the iterator, like `iter(config).flat_map(pre_proc).par_bridge().for_each(task)`
+
 ## Release 0.12.1 - 2022-04-23
 
 ### Changed

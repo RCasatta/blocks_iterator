@@ -45,6 +45,10 @@ pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
     BlockExtraIterator { handle, recv }
 }
 
+#[deprecated(
+    note = "you can get better and composable results by concateneting method on iter like 
+    blocks_iterator::iter(config).flat_map(PREPROC).par_bridge().for_each(TASK)"
+)]
 #[cfg(feature = "parallel")]
 /// `par_iter` is used when the task to be performed on the blockchain is more costly
 /// than iterating the blocks. For example verifying the spending conditions in the blockchain.
@@ -104,4 +108,38 @@ pub fn par_iter<STATE, PREPROC, TASK, DATA>(
         }
     });
     handle.join().unwrap();
+}
+
+#[cfg(test)]
+mod inner_test {
+    use bitcoin::blockdata::constants::genesis_block;
+
+    use super::*;
+    use crate::bitcoin::Network;
+    use crate::Config;
+
+    fn test_conf() -> Config {
+        Config {
+            blocks_dir: "blocks".into(),
+            network: Network::Testnet,
+            skip_prevout: false,
+            max_reorg: 10,
+            channels_size: 0,
+            #[cfg(feature = "db")]
+            utxo_db: None,
+            stop_at_height: None,
+        }
+    }
+
+    #[test]
+    fn test_iter() {
+        let _ = env_logger::try_init();
+        let genesis = genesis_block(Network::Testnet);
+        let mut current = genesis.clone();
+        for b in iter(test_conf()).skip(1) {
+            assert_eq!(current.block_hash(), b.block.header.prev_blockhash);
+            current = b.block;
+        }
+        assert_ne!(genesis, current);
+    }
 }

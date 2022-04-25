@@ -34,7 +34,7 @@ rayon = { version = "1.5.0", optional = true }
 tempfile = "3.2.0"
 
 [features]
-default = ["db", "parallel", "consensus"]
+default = ["db", "consensus"]
 db = ["rocksdb", "rand"]
 parallel = ["rayon"]
 consensus = ["bitcoinconsensus", "bitcoin/bitcoinconsensus"]

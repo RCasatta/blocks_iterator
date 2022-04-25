@@ -4,6 +4,7 @@ use bitcoinconsensus::height_to_flags;
 use blocks_iterator::{BlockExtra, Config};
 use env_logger::Env;
 use log::{debug, error, info};
+use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::error::Error;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -42,33 +43,32 @@ fn pre_processing(mut block_extra: BlockExtra) -> Vec<VerifyData> {
     vec
 }
 
-fn task(data: VerifyData, error_count: Arc<AtomicUsize>) -> bool {
-    debug!("task");
-
-    if let Err(e) =
-        data.script_pubkey
-            .verify_with_flags(data.index, data.amount, &data.spending, data.flags)
-    {
-        error!("{:?}", e);
-        error!("{:?}", data);
-        let tx: Transaction = deserialize(&data.spending).unwrap();
-        error!("tx: {}", tx.txid());
-        error_count.fetch_add(1, Ordering::SeqCst);
-    }
-    false
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     info!("start");
 
     let config = Config::from_args();
 
-    let state = Arc::new(AtomicUsize::new(0));
+    let errors: Vec<_> = blocks_iterator::iter(config)
+        .flat_map(pre_processing)
+        .par_bridge()
+        .filter_map(|d| {
+            match d
+                .script_pubkey
+                .verify_with_flags(d.index, d.amount, &d.spending, d.flags)
+            {
+                Err(e) => Some((d, e)),
+                _ => None,
+            }
+        })
+        .collect();
 
-    blocks_iterator::par_iter(config, state.clone(), pre_processing, task);
-
-    info!("error count: {}", state.load(Ordering::SeqCst));
+    for (data, e) in errors {
+        error!("{:?}", e);
+        error!("{:?}", data);
+        let tx: Transaction = deserialize(&data.spending).unwrap();
+        error!("tx: {}", tx.txid());
+    }
 
     Ok(())
 }

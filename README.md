@@ -13,10 +13,10 @@ Features:
 
 ### In rust programs
 
-Used as a library blocks could be iterated:
+Used as a library blocks could be iterated via the [`blocks_iterator::iter`](https://docs.rs/blocks_iterator/latest/blocks_iterator/fn.iter.html) method like done in [outputs_versions](examples/outputs_versions.rs) example.
 
-* via the [`blocks_iterator::iter`](https://docs.rs/blocks_iterator/latest/blocks_iterator/fn.iter.html) method like done in [outputs_versions](examples/outputs_versions.rs) example
-* via the [`blocks_iterator::par_iter`](https://docs.rs/blocks_iterator/latest/blocks_iterator/fn.par_iter.html) method like done in [verify](examples/verify.rs) example. `par_iter` is preferred when the task to be perforemd is computational costly.
+When the task to be performed is computational costly, like verifying spending conditions, it is suggested to parallelize the execution like it's done with rayon
+(or similar) in the [verify](examples/verify.rs) example (note `par_bridge()` call).
 
 ### Through Pipes
 
