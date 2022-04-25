@@ -19,11 +19,11 @@
 extern crate test;
 
 use bitcoin::BlockHash;
-use log::{info, Level};
+use log::{error, info, Level};
 use std::fs::File;
 
 use std::path::PathBuf;
-use std::sync::mpsc::{sync_channel, SyncSender};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
@@ -162,6 +162,44 @@ pub fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinH
 
         info!("Total time elapsed: {}s", now.elapsed().as_secs());
     })
+}
+
+struct BlockExtraIterator {
+    handle: Option<JoinHandle<()>>,
+    recv: Receiver<Option<BlockExtra>>,
+}
+impl Iterator for BlockExtraIterator {
+    type Item = BlockExtra;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.recv.recv() {
+            Ok(Some(val)) => Some(val),
+            Ok(None) => {
+                if let Some(handle) = self.handle.take() {
+                    handle.join().unwrap();
+                }
+                None
+            }
+            Err(e) => {
+                error!("error iterating {:?}", e);
+                if let Some(handle) = self.handle.take() {
+                    handle.join().unwrap();
+                }
+                None
+            }
+        }
+    }
+}
+
+/// Return an Iterator of [`BlockExtra`] read from `blocks*.dat` contained in the `config.blocks_dir`
+/// Blocks returned are iterated in order, starting from the genesis to the highest block
+/// (minus `config.max_reorg`) in the directory, unless `config.stop_at_height` is specified.
+pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
+    let (send, recv) = sync_channel(config.channels_size.into());
+
+    let handle = Some(iterate(config, send));
+
+    BlockExtraIterator { handle, recv }
 }
 
 /// Utility method usually returning [log::Level::Debug] but when `i` is divisible by `every` returns [log::Level::Info]
