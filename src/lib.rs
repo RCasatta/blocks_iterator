@@ -40,12 +40,10 @@ use utxo::AnyUtxo;
 pub use period::{PeriodCounter, Periodic};
 
 mod block_extra;
-mod fee;
 mod iter;
 mod period;
 mod pipe;
-mod read_detect;
-mod reorder;
+mod stages;
 mod utxo;
 
 // re-exporting deps
@@ -151,7 +149,7 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
 
         // FsBlock is a small struct (~120b), so 10_000 is not a problem but allows the read_detect to read ahead the next block file
         let (send_block_fs, receive_block_fs) = sync_channel(0);
-        let _read = read_detect::ReadDetect::new(
+        let _read = stages::ReadDetect::new(
             config.blocks_dir.clone(),
             config.network,
             early_stop.clone(),
@@ -166,7 +164,7 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
         } else {
             send_ordered_blocks
         };
-        let _reorder = reorder::Reorder::new(
+        let _reorder = stages::Reorder::new(
             config.network,
             config.max_reorg,
             config.stop_at_height,
@@ -176,7 +174,7 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
         );
 
         if !config.skip_prevout {
-            let _fee = fee::Fee::new(receive_ordered_blocks, channel, config.utxo_manager());
+            let _fee = stages::Fee::new(receive_ordered_blocks, channel, config.utxo_manager());
         }
 
         info!("Total time elapsed: {}s", now.elapsed().as_secs());

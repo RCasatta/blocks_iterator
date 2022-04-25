@@ -196,7 +196,7 @@ impl RollingU32 {
 
 #[cfg(test)]
 mod test {
-    use crate::read_detect::RollingU32;
+    use crate::stages::read_detect::RollingU32;
 
     #[test]
     fn test_rolling() {
