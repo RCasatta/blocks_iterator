@@ -24,12 +24,12 @@
 extern crate test;
 
 use bitcoin::BlockHash;
-use log::{error, info, Level};
+use log::{info, Level};
 use std::fs::File;
 
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
+use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
@@ -41,6 +41,7 @@ pub use period::{PeriodCounter, Periodic};
 
 mod block_extra;
 mod fee;
+mod iter;
 mod period;
 mod pipe;
 mod read_detect;
@@ -55,7 +56,11 @@ pub use log;
 pub use structopt;
 
 pub use block_extra::BlockExtra;
+pub use iter::iter;
 pub use pipe::PipeIterator;
+
+#[cfg(feature = "parallel")]
+pub use iter::par_iter;
 
 /// Configuration parameters, most important the bitcoin blocks directory
 #[derive(StructOpt, Debug, Clone)]
@@ -137,102 +142,6 @@ pub struct FsBlock {
     /// The hash of the blocks following this one. It is populated during the reorder phase, it can
     /// be more than one because of reorgs.
     pub next: Vec<BlockHash>,
-}
-
-struct BlockExtraIterator {
-    handle: Option<JoinHandle<()>>,
-    recv: Receiver<Option<BlockExtra>>,
-}
-impl Iterator for BlockExtraIterator {
-    type Item = BlockExtra;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.recv.recv() {
-            Ok(Some(val)) => Some(val),
-            Ok(None) => {
-                if let Some(handle) = self.handle.take() {
-                    handle.join().unwrap();
-                }
-                None
-            }
-            Err(e) => {
-                error!("error iterating {:?}", e);
-                if let Some(handle) = self.handle.take() {
-                    handle.join().unwrap();
-                }
-                None
-            }
-        }
-    }
-}
-
-/// Return an Iterator of [`BlockExtra`] read from `blocks*.dat` contained in the `config.blocks_dir`
-/// Blocks returned are iterated in order, starting from the genesis to the highest block
-/// (minus `config.max_reorg`) in the directory, unless `config.stop_at_height` is specified.
-pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
-    let (send, recv) = sync_channel(config.channels_size.into());
-
-    let handle = Some(iterate(config, send));
-
-    BlockExtraIterator { handle, recv }
-}
-
-#[cfg(feature = "parallel")]
-/// `par_iter` is used when the task to be performed on the blockchain is more costly
-/// than iterating the blocks. For example verifying the spending conditions in the blockchain.
-/// like [`crate::iter`] accepts configuration parameters via the [`Config`] struct.
-/// A `PREPROC` closure has to be provided, this process a single block and produce a Vec of
-/// user defined struct `DATA`.
-/// A `TASK` closure accepts the `DATA` struct and a shared `STATE` and it is executed in a
-/// concurrent way. The `TASK` closure returns a bool which indicates if the execution should be
-/// terminated.
-/// Note that access to `STATE` in `TASK` should be done carefully otherwise the contention would
-/// reduce the speed of execution.
-///  
-pub fn par_iter<STATE, PREPROC, TASK, DATA>(
-    config: Config,
-    state: Arc<STATE>,
-    pre_processing: PREPROC,
-    task: TASK,
-) where
-    PREPROC: Fn(BlockExtra) -> Vec<DATA> + 'static + Send,
-    TASK: Fn(DATA, Arc<STATE>) -> bool + 'static + Send + Sync,
-    DATA: 'static + Send,
-    STATE: 'static + Send + Sync,
-{
-    use log::debug;
-    use rayon::prelude::*;
-    use std::sync::atomic::Ordering::SeqCst;
-
-    let (send_task, recv_task) = sync_channel(config.channels_size.into());
-    let stop = Arc::new(AtomicBool::new(false));
-
-    let stop_clone = stop.clone();
-    let iter = iter(config);
-
-    let handle = thread::spawn(move || {
-        debug!("start pre-processing thread");
-        for block_extra in iter {
-            if stop_clone.load(SeqCst) {
-                break;
-            }
-            let data_vec = pre_processing(block_extra);
-            for data in data_vec {
-                send_task.send(data).unwrap();
-            }
-        }
-        debug!("ending pre-processing thread");
-    });
-
-    recv_task.into_iter().par_bridge().for_each(|data: DATA| {
-        debug!("iter");
-        let result = task(data, state.clone());
-
-        if result {
-            stop.store(true, SeqCst)
-        }
-    });
-    handle.join().unwrap();
 }
 
 fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {
