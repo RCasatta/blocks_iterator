@@ -4,8 +4,7 @@
 //! of [BlockExtra]
 //!
 //! Blocks could be consumed in 2 different ways:
-//! * Through the [`iter`] or [`par_iter`] method. The latter is to be preferred when performing
-//!   costly task.
+//! * Through the [`iter`] method.
 //! * Via unix pipeline using the [`PipeIterator`]
 //!
 
