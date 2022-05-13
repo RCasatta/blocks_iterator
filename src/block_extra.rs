@@ -8,7 +8,7 @@ use std::convert::TryFrom;
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::ops::DerefMut;
 
-/// The bitcoin block and additional metadata returned by the [crate::iter] method
+/// The bitcoin block and additional metadata returned by the [crate::iter()] method
 #[derive(Debug, Eq, PartialEq)]
 pub struct BlockExtra {
     /// The bitcoin block
