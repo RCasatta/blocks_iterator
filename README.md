@@ -1,5 +1,6 @@
 [![MIT license](https://img.shields.io/github/license/RCasatta/blocks_iterator)](https://github.com/RCasatta/blocks_iterator/blob/master/LICENSE)
 [![Crates](https://img.shields.io/crates/v/blocks_iterator.svg)](https://crates.io/crates/blocks_iterator)
+[![Docs](https://img.shields.io/badge/docs.rs-blocks_iterator-green)](https://docs.rs/blocks_iterator)
 
 # Blocks iterator
 
@@ -20,7 +21,7 @@ When the task to be performed is computational costly, like verifying spending c
 
 ### Through Pipes
 
-Other than inside Rust programs, ordered blocks with prevouts could be iterated using Unix pipes.
+Other than inside Rust programs, ordered blocks with previous outputs could be iterated using Unix pipes.
 
 ```
 $ cargo build --release 
@@ -33,7 +34,7 @@ $ ./target/release/blocks_iterator --blocks-dir /Volumes/Transcend/bitcoin-testn
 
 ## Memory requirements and performance
 
-Running (`cargo run --release -- --network X --blocks-dir Y >/dev/null`) on threadripper 1950X, Testnet @ 2130k, Mainnet @ 705k. Spinning disk.
+Running (`cargo run --release -- --network X --blocks-dir Y >/dev/null`) on threadripper 1950X, Testnet @ 2130k, Mainnet @ 705k. Spinning disk. Take following benchmarks with a grain of salt since they refer to older versions.
 
 | Network | `--skip--prevout` | `--max-reorg` | `utxo-db` | Memory | Time    |
 |---------|-------------------|---------------|----------:|-------:|--------:|
@@ -58,15 +59,20 @@ cargo run --release --example verify
 * [most_output](examples/most_output_pipe.rs) find the transaction with most output
 * [outputs_versions](examples/outputs_versions.rs) Count outputs witness version
 * [signatures_in_witness](examples/signatures_in_witness.rs) Count signatures in witness
-* [verify](examples/verify.rs) verify transactions in blocks using libbitcoin-consensus
+* [verify](examples/verify.rs) verify transactions in blocks using libbitcoin-consensus. Consumers are run in parallel fashion.
 
 
 ## Similar projects
 
 * [bitcoin-iterate](https://github.com/rustyrussell/bitcoin-iterate) this project inspired blocks_iterator, the differences are:
-  * bitcoin-iterate is C-based
-  * bitcoin-iterate it's more suited for shell piping, while blocks_itearator is intended to use as a rust library
-  * bitcoin-iterate doesn't give previous outputs information
-  * bitcoin-iterate is making two passage over `blocks*.dat` while blocks_iterator is doing one pass keeping out-order-blocks in memory (the latter is faster at the expense of higher memory usage)
+  * It is C-based
+  * It's more suited for shell piping, while blocks_iterator can be used with piping but also as a rust library
+  * It doesn't give previous outputs information
+  * It is making two passage over `blocks*.dat` serially, while blocks_iterator is doing two passes in parallel.
 * [rust-bitcoin-indexer](https://github.com/dpc/rust-bitcoin-indexer) this project requires longer setup times (about 9 hours indexing) and a postgre database, once the indexing is finished it allows fast queries on relational database.
 * [electrs](https://github.com/romanz/electrs) specifically intended for the Electrum protocol
+
+
+## MSRV 
+
+Check minimum rust version run in CI (as of May 2022 is `1.56.1`)
