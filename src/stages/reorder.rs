@@ -113,7 +113,7 @@ impl Reorder {
                 let mut last_height = 0;
                 loop {
                     busy_time += now.elapsed().as_nanos();
-                    let received = receiver.recv().expect("cannot receive blob");
+                    let received = receiver.recv().unwrap_or_default();
                     now = Instant::now();
                     match received {
                         Some(raw_blocks) => {
