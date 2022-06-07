@@ -2,6 +2,7 @@ use crate::bitcoin::consensus::encode::Error;
 use crate::bitcoin::consensus::{Decodable, Encodable};
 use crate::bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut};
 use crate::FsBlock;
+use bitcoin::Txid;
 use log::debug;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -11,6 +12,8 @@ use std::ops::DerefMut;
 /// The bitcoin block and additional metadata returned by the [crate::iter()] method
 #[derive(Debug, Eq, PartialEq)]
 pub struct BlockExtra {
+    /// Serialization format version
+    pub version: u8,
     /// The bitcoin block
     pub block: Block,
     /// The bitcoin block hash, same as `block.block_hash()` but result from hashing is cached
@@ -26,6 +29,12 @@ pub struct BlockExtra {
     /// Note that when configuration `skip_script_pubkey` is true, the script is empty,
     /// when `skip_prevout` is true, this map is empty.
     pub outpoint_values: HashMap<OutPoint, TxOut>,
+    /// Total number of transaction inputs in this block
+    pub block_total_inputs: u32,
+    /// Total number of transaction outputs in this block
+    pub block_total_outputs: u32,
+    /// Precomputed transaction hashes such that `txids[i]=block.txdata[i].txid()`
+    pub txids: Vec<Txid>,
 }
 
 impl TryFrom<FsBlock> for BlockExtra {
@@ -43,12 +52,16 @@ impl TryFrom<FsBlock> for BlockExtra {
         debug!("going to read: {:?}", file);
         let reader = BufReader::new(file);
         Ok(BlockExtra {
+            version: 0,
             block: Block::consensus_decode(reader).map_err(|e| err(e.to_string(), &fs_block))?,
             block_hash: fs_block.hash,
             size: (fs_block.end - fs_block.start) as u32,
             next: fs_block.next,
             height: 0,
             outpoint_values: Default::default(),
+            block_total_inputs: 0,
+            block_total_outputs: 0,
+            txids: vec![],
         })
     }
 }
@@ -89,6 +102,7 @@ impl BlockExtra {
 impl Encodable for BlockExtra {
     fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, std::io::Error> {
         let mut written = 0;
+        written += self.version.consensus_encode(&mut writer)?;
         written += self.block.consensus_encode(&mut writer)?;
         written += self.block_hash.consensus_encode(&mut writer)?;
         written += self.size.consensus_encode(&mut writer)?;
@@ -99,6 +113,12 @@ impl Encodable for BlockExtra {
             written += out_point.consensus_encode(&mut writer)?;
             written += tx_out.consensus_encode(&mut writer)?;
         }
+        written += self.block_total_inputs.consensus_encode(&mut writer)?;
+        written += self.block_total_outputs.consensus_encode(&mut writer)?;
+        written += (self.txids.len() as u32).consensus_encode(&mut writer)?;
+        for txid in self.txids.iter() {
+            written += txid.consensus_encode(&mut writer)?;
+        }
         Ok(written)
     }
 }
@@ -106,6 +126,7 @@ impl Encodable for BlockExtra {
 impl Decodable for BlockExtra {
     fn consensus_decode<D: Read>(mut d: D) -> Result<Self, Error> {
         Ok(BlockExtra {
+            version: Decodable::consensus_decode(&mut d)?,
             block: Decodable::consensus_decode(&mut d)?,
             block_hash: Decodable::consensus_decode(&mut d)?,
             size: Decodable::consensus_decode(&mut d)?,
@@ -122,6 +143,16 @@ impl Decodable for BlockExtra {
                 }
                 m
             },
+            block_total_inputs: Decodable::consensus_decode(&mut d)?,
+            block_total_outputs: Decodable::consensus_decode(&mut d)?,
+            txids: {
+                let len = u32::consensus_decode(&mut d)?;
+                let mut v = Vec::with_capacity(len as usize);
+                for _ in 0..len {
+                    v.push(Decodable::consensus_decode(&mut d)?);
+                }
+                v
+            },
         })
     }
 }
@@ -132,6 +163,7 @@ mod test {
     use crate::bitcoin::{Block, BlockHeader, OutPoint, TxOut};
     use crate::BlockExtra;
     use bitcoin::consensus::deserialize;
+    use bitcoin::consensus::encode::serialize_hex;
     use std::collections::HashMap;
 
     #[test]
@@ -144,6 +176,7 @@ mod test {
 
     fn block_extra() -> BlockExtra {
         BlockExtra {
+            version: 0,
             block: Block {
                 header: BlockHeader {
                     version: 0,
@@ -164,6 +197,9 @@ mod test {
                 m.insert(OutPoint::default(), TxOut::default());
                 m
             },
+            block_total_inputs: 0,
+            block_total_outputs: 0,
+            txids: vec![],
         }
     }
 
@@ -179,5 +215,12 @@ mod test {
         assert_eq!(be.base_reward(), 1_250_000_000);
         be.height = 630_000;
         assert_eq!(be.base_reward(), 625_000_000);
+    }
+
+    #[test]
+    fn test_hex() {
+        let be = block_extra();
+        let hex = serialize_hex(&be);
+        assert_eq!(hex, "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffff00000000000000000000000000");
     }
 }
