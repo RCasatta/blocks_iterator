@@ -1,5 +1,6 @@
-use crate::bitcoin::{Block, Network, Transaction, Txid};
+use crate::bitcoin::{Network, Transaction, Txid};
 use crate::utxo::{Hash64, UtxoStore};
+use crate::BlockExtra;
 use bitcoin::hashes::Hash;
 use bitcoin::{OutPoint, PubkeyHash, Script, ScriptHash, TxOut, WPubkeyHash};
 use fxhash::FxHashMap;
@@ -21,23 +22,22 @@ impl MemUtxo {
 }
 
 impl MemUtxo {
-    fn add_tx_outputs(&mut self, tx: &Transaction) -> Txid {
-        let txid = tx.txid();
+    fn add_tx_outputs(&mut self, txid: &Txid, tx: &Transaction) {
         for (i, output) in tx.output.iter().enumerate() {
             if output.script_pubkey.is_provably_unspendable() {
                 self.unspendable += 1;
                 continue;
             }
-            self.map.insert(OutPoint::new(txid, i as u32), output);
+            self.map.insert(OutPoint::new(*txid, i as u32), output);
         }
-        txid
     }
 }
 
 impl UtxoStore for MemUtxo {
-    fn add_outputs_get_inputs(&mut self, block: &Block, _height: u32) -> Vec<TxOut> {
-        for tx in block.txdata.iter() {
-            self.add_tx_outputs(tx);
+    fn add_outputs_get_inputs(&mut self, block_extra: &BlockExtra, _height: u32) -> Vec<TxOut> {
+        let block = &block_extra.block;
+        for (txid, tx) in block_extra.iter_tx() {
+            self.add_tx_outputs(txid, tx);
         }
         let total_inputs = block.txdata.iter().skip(1).map(|e| e.input.len()).sum();
         let mut prevouts = Vec::with_capacity(total_inputs);

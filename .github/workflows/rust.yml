@@ -47,7 +47,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [ "verify --features consensus,parallel", "signatures_in_witness", "outputs_versions"]
+        example: [ "verify --features consensus", "signatures_in_witness", "outputs_versions"]
     steps:
       - uses: actions/checkout@v2
       - uses: Swatinem/rust-cache@v1.2.0

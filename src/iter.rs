@@ -49,7 +49,6 @@ pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
     note = "you can get better and composable results by concateneting method on iter like 
     blocks_iterator::iter(config).flat_map(PREPROC).par_bridge().for_each(TASK)"
 )]
-#[cfg(feature = "parallel")]
 /// `par_iter` is used when the task to be performed on the blockchain is more costly
 /// than iterating the blocks. For example verifying the spending conditions in the blockchain.
 /// like [`crate::iter`] accepts configuration parameters via the [`Config`] struct.

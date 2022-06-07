@@ -45,7 +45,7 @@ impl Fee {
                             total_txs += block_extra.block.txdata.len() as u64;
 
                             let mut prevouts =
-                                utxo.add_outputs_get_inputs(&block_extra.block, block_extra.height);
+                                utxo.add_outputs_get_inputs(&block_extra, block_extra.height);
                             let mut prevouts = prevouts.drain(..);
 
                             for tx in block_extra.block.txdata.iter().skip(1) {

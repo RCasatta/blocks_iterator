@@ -56,7 +56,7 @@ pub use block_extra::BlockExtra;
 pub use iter::iter;
 pub use pipe::PipeIterator;
 
-#[cfg(feature = "parallel")]
+#[allow(deprecated)]
 pub use iter::par_iter;
 
 /// Configuration parameters, most important the bitcoin blocks directory
@@ -163,12 +163,6 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
 
         let (send_ordered_blocks, receive_ordered_blocks) =
             sync_channel(config.channels_size.into());
-        let send_ordered_blocks = if config.skip_prevout {
-            // if skip_prevout is true, we send directly to end step
-            channel.clone()
-        } else {
-            send_ordered_blocks
-        };
         let _reorder = stages::Reorder::new(
             config.network,
             config.max_reorg,
@@ -179,10 +173,21 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
             send_ordered_blocks,
         );
 
+        let (send_blocks_with_txids, receive_blocks_with_txids) =
+            sync_channel(config.channels_size.into());
+        let send_blocks_with_txids = if config.skip_prevout {
+            // if skip_prevout is true, we send directly to end step
+            channel.clone()
+        } else {
+            send_blocks_with_txids
+        };
+        let _compute_txids =
+            stages::ComputeTxids::new(receive_ordered_blocks, send_blocks_with_txids);
+
         if !config.skip_prevout {
             let _fee = stages::Fee::new(
                 config.start_at_height,
-                receive_ordered_blocks,
+                receive_blocks_with_txids,
                 channel,
                 config.utxo_manager(),
             );
@@ -253,6 +258,10 @@ mod inner_test {
         while let Some(b) = recv.recv().unwrap() {
             if b.height == 394 {
                 assert_eq!(b.fee(), Some(50_000));
+            }
+            assert!(b.iter_tx().next().is_some());
+            for (txid, tx) in b.iter_tx() {
+                assert_eq!(*txid, tx.txid());
             }
         }
         handle.join().unwrap();

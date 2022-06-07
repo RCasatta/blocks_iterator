@@ -6,7 +6,6 @@ use env_logger::Env;
 use log::{debug, error, info};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::error::Error;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use structopt::StructOpt;
 

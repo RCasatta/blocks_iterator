@@ -1,6 +1,7 @@
 use crate::bitcoin::consensus::serialize;
-use crate::bitcoin::{Block, OutPoint, TxOut};
+use crate::bitcoin::{OutPoint, TxOut};
 use crate::utxo::UtxoStore;
+use crate::BlockExtra;
 use bitcoin::consensus::{deserialize, Encodable};
 use log::{debug, info};
 use rocksdb::{Options, WriteBatch, DB};
@@ -62,7 +63,8 @@ fn serialize_prevouts_height(h: i32) -> [u8; 5] {
 }
 
 impl UtxoStore for DbUtxo {
-    fn add_outputs_get_inputs(&mut self, block: &Block, height: u32) -> Vec<TxOut> {
+    fn add_outputs_get_inputs(&mut self, block_extra: &BlockExtra, height: u32) -> Vec<TxOut> {
+        let block = &block_extra.block;
         let mut outpoint_buffer = [0u8; 37]; // prefix(1) + txid (32) + vout (4)
         let mut txout_buffer = [0u8; 10_011]; // max(script) (10_000) +  max(varint) (3) + value (8)  (there are exceptions, see where used)
 
@@ -75,11 +77,10 @@ impl UtxoStore for DbUtxo {
             // since we can spend outputs created in this same block, we first put outputs in memory...
             let total_outputs = block.txdata.iter().map(|e| e.output.len()).sum();
             let mut block_outputs = HashMap::with_capacity(total_outputs);
-            for tx in block.txdata.iter() {
-                let txid = tx.txid();
+            for (txid, tx) in block_extra.iter_tx() {
                 for (i, output) in tx.output.iter().enumerate() {
                     if !output.script_pubkey.is_provably_unspendable() {
-                        let outpoint = OutPoint::new(txid, i as u32);
+                        let outpoint = OutPoint::new(*txid, i as u32);
                         block_outputs.insert(outpoint, output);
                     }
                 }

@@ -1,5 +1,4 @@
-use crate::bitcoin::consensus::encode::Error;
-use crate::bitcoin::consensus::{Decodable, Encodable};
+use crate::bitcoin::consensus::{encode, Decodable, Encodable};
 use crate::bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut};
 use crate::FsBlock;
 use bitcoin::Txid;
@@ -51,16 +50,22 @@ impl TryFrom<FsBlock> for BlockExtra {
             .map_err(|e| err(e.to_string(), &fs_block))?;
         debug!("going to read: {:?}", file);
         let reader = BufReader::new(file);
+        let block = Block::consensus_decode(reader).map_err(|e| err(e.to_string(), &fs_block))?;
+
+        let txs = &block.txdata;
+        let block_total_inputs = txs.iter().fold(0usize, |acc, tx| acc + tx.input.len());
+        let block_total_outputs = txs.iter().fold(0usize, |acc, tx| acc + tx.output.len());
+
         Ok(BlockExtra {
             version: 0,
-            block: Block::consensus_decode(reader).map_err(|e| err(e.to_string(), &fs_block))?,
+            block,
             block_hash: fs_block.hash,
             size: (fs_block.end - fs_block.start) as u32,
             next: fs_block.next,
             height: 0,
-            outpoint_values: Default::default(),
-            block_total_inputs: 0,
-            block_total_outputs: 0,
+            outpoint_values: HashMap::with_capacity(block_total_inputs),
+            block_total_inputs: block_total_inputs as u32,
+            block_total_outputs: block_total_outputs as u32,
             txids: vec![],
         })
     }
@@ -91,11 +96,16 @@ impl BlockExtra {
         Some(input_total - output_total)
     }
 
-    /// return the base block reward in satoshi
+    /// Return the base block reward in satoshi
     pub fn base_reward(&self) -> u64 {
         let initial = 50 * 100_000_000u64;
         let division = self.height as u64 / 210_000u64;
         initial >> division
+    }
+
+    /// Iterate transactions of blocks together with their txids
+    pub fn iter_tx(&self) -> impl Iterator<Item = (&Txid, &Transaction)> {
+        self.txids.iter().zip(self.block.txdata.iter())
     }
 }
 
@@ -124,7 +134,7 @@ impl Encodable for BlockExtra {
 }
 
 impl Decodable for BlockExtra {
-    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, Error> {
+    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
         Ok(BlockExtra {
             version: Decodable::consensus_decode(&mut d)?,
             block: Decodable::consensus_decode(&mut d)?,

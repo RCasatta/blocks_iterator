@@ -1,4 +1,4 @@
-use crate::bitcoin::{Block, TxOut};
+use crate::{bitcoin::TxOut, BlockExtra};
 
 mod mem;
 
@@ -16,7 +16,7 @@ pub trait UtxoStore {
     /// Return all the prevouts in the block at `height` in the order they are found in the block.
     /// First element in the vector is the prevout of the first input of the first transaction after
     /// the coinbase
-    fn add_outputs_get_inputs(&mut self, block: &Block, height: u32) -> Vec<TxOut>;
+    fn add_outputs_get_inputs(&mut self, block_extra: &BlockExtra, height: u32) -> Vec<TxOut>;
 
     /// return stats about the Utxo
     fn stat(&self) -> String;
@@ -33,11 +33,11 @@ pub enum AnyUtxo {
 }
 
 impl UtxoStore for AnyUtxo {
-    fn add_outputs_get_inputs(&mut self, block: &Block, height: u32) -> Vec<TxOut> {
+    fn add_outputs_get_inputs(&mut self, block_extra: &BlockExtra, height: u32) -> Vec<TxOut> {
         match self {
             #[cfg(feature = "db")]
-            AnyUtxo::Db(db) => db.add_outputs_get_inputs(block, height),
-            AnyUtxo::Mem(mem) => mem.add_outputs_get_inputs(block, height),
+            AnyUtxo::Db(db) => db.add_outputs_get_inputs(block_extra, height),
+            AnyUtxo::Mem(mem) => mem.add_outputs_get_inputs(block_extra, height),
         }
     }
 
