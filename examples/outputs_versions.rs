@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             info!("taproot locked in");
         }
 
-        for tx in block_extra.block.txdata {
+        for (txid, tx) in block_extra.iter_tx() {
             for (i, output) in tx.output.iter().enumerate() {
                 if output.script_pubkey.is_witness_program() {
                     let mut version = output.script_pubkey.as_bytes()[0] as usize;
@@ -45,10 +45,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     if version >= 1 {
                         let log_line = format!(
                             "tx:{} output:{} version:{} height:{}",
-                            tx.txid(),
-                            i,
-                            version,
-                            block_extra.height
+                            txid, i, version, block_extra.height
                         );
                         info!("{}", log_line);
                         output_file.write(log_line.as_bytes()).unwrap();

@@ -14,11 +14,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let iter = PipeIterator::new(io::stdin(), Some(io::stdout()));
 
     for block_extra in iter {
-        for tx in block_extra.block.txdata.iter() {
+        for (txid, tx) in block_extra.iter_tx() {
             if tx.output.len() > most_output.1 {
-                let txid = tx.txid();
                 info!("New most_output tx: {}", txid);
-                most_output = (txid, tx.output.len());
+                most_output = (*txid, tx.output.len());
             }
         }
     }
