@@ -1,6 +1,7 @@
 use crate::BlockExtra;
 use log::info;
 use rayon::prelude::*;
+use rayon::ThreadPool;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
@@ -26,16 +27,20 @@ impl ComputeTxids {
     ) -> Self {
         Self {
             join: Some(std::thread::spawn(move || {
-                info!("starting augment processer");
+                info!("starting compute tx ids");
                 let mut now = Instant::now();
                 let mut busy_time = Duration::default();
+                let pool = rayon::ThreadPoolBuilder::new()
+                    .num_threads(4)
+                    .build()
+                    .unwrap();
                 loop {
                     busy_time += now.elapsed();
                     let received = receiver.recv().unwrap();
                     now = Instant::now();
                     match received {
                         Some(mut block_extra) => {
-                            block_extra.compute_txids();
+                            block_extra.compute_txids(&pool);
                             busy_time += now.elapsed();
                             sender.send(Some(block_extra)).unwrap();
                             now = Instant::now();
@@ -43,7 +48,7 @@ impl ComputeTxids {
                         None => break,
                     }
                 }
-                info!("ending augment processer busy time: {:?}", busy_time,);
+                info!("ending compute tx ids busy time: {:?}", busy_time,);
                 sender.send(None).expect("augment: cannot send none");
             })),
         }
@@ -51,11 +56,12 @@ impl ComputeTxids {
 }
 
 impl BlockExtra {
-    fn compute_txids(&mut self) {
+    fn compute_txids(&mut self, pool: &ThreadPool) {
         if !self.txids.is_empty() {
             return;
         }
-
-        self.txids = self.block.txdata.par_iter().map(|tx| tx.txid()).collect();
+        // without using a thread pool it may interact badly with library consumer using rayon,
+        // causing deadlock on the global thread pool
+        self.txids = pool.install(|| self.block.txdata.par_iter().map(|tx| tx.txid()).collect());
     }
 }

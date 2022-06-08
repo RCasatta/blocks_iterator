@@ -69,6 +69,8 @@ impl ReadDetect {
         let mut periodic = Periodic::new(Duration::from_secs(60));
         Self {
             join: Some(std::thread::spawn(move || {
+                info!("starting read_detect");
+
                 let mut now = Instant::now();
                 let mut seen = Seen::new();
                 let mut path = blocks_dir.clone();
@@ -112,10 +114,11 @@ impl ReadDetect {
                     now = Instant::now();
                 }
                 info!(
-                    "ending reader parse , busy time: {}s",
+                    "ending read_detect , busy time: {}s",
                     (busy_time / 1_000_000_000)
                 );
                 if !early_stop.load(Ordering::Relaxed) {
+                    info!("sending None");
                     sender.send(None).expect("cannot send");
                 }
             })),

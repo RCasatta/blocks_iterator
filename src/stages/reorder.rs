@@ -106,6 +106,8 @@ impl Reorder {
         let mut periodic = Periodic::new(Duration::from_secs(60));
         Self {
             join: Some(std::thread::spawn(move || {
+                info!("starting reorder");
+
                 let mut bench = PeriodCounter::new(Duration::from_secs(10));
 
                 let mut busy_time = 0u128;
@@ -114,6 +116,8 @@ impl Reorder {
                 loop {
                     busy_time += now.elapsed().as_nanos();
                     let received = receiver.recv().unwrap_or_default();
+                    info!("reorder receive {:?}", received.as_ref().map(|e| e.len()));
+
                     now = Instant::now();
                     match received {
                         Some(raw_blocks) => {
