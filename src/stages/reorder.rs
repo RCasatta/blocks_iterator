@@ -116,7 +116,6 @@ impl Reorder {
                 loop {
                     busy_time += now.elapsed().as_nanos();
                     let received = receiver.recv().unwrap_or_default();
-                    info!("reorder receive {:?}", received.as_ref().map(|e| e.len()));
 
                     now = Instant::now();
                     match received {
