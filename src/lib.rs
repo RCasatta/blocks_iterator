@@ -249,32 +249,32 @@ mod inner_test {
         let _ = env_logger::try_init();
 
         let tempdir = tempfile::TempDir::new().unwrap();
-        let mut conf = test_conf();
-        conf.utxo_db = Some(tempdir.path().to_path_buf());
+        let conf = {
+            let mut conf = test_conf();
+            conf.utxo_db = Some(tempdir.path().to_path_buf());
+            conf
+        };
 
-        let (send, recv) = sync_channel(0);
-
-        let handle = iterate(conf.clone(), send);
-        while let Some(b) = recv.recv().unwrap() {
-            if b.height == 394 {
+        let mut max_height = 0;
+        for b in super::iter(conf.clone()) {
+            max_height = max_height.max(b.height);
+            if b.height == 389 {
                 assert_eq!(b.fee(), Some(50_000));
+                assert_eq!(b.iter_tx().size_hint(), (2, Some(2)));
             }
             assert!(b.iter_tx().next().is_some());
             for (txid, tx) in b.iter_tx() {
                 assert_eq!(*txid, tx.txid());
             }
         }
-        handle.join().unwrap();
+        assert_eq!(max_height, 390);
 
         // iterating twice, this time prevouts come directly from db
-        let (send, recv) = sync_channel(0);
-        let handle = iterate(conf, send);
-        while let Some(b) = recv.recv().unwrap() {
+        for b in super::iter(conf) {
             if b.height == 394 {
                 assert_eq!(b.fee(), Some(50_000));
             }
         }
-        handle.join().unwrap();
     }
 }
 
