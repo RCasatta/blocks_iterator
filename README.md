@@ -61,6 +61,10 @@ cargo run --release --example verify
 * [signatures_in_witness](examples/signatures_in_witness.rs) Count signatures in witness
 * [verify](examples/verify.rs) verify transactions in blocks using libbitcoin-consensus. Consumers are run in parallel fashion.
 
+## Version 1.0 meaning
+
+The `1.0` is not to be intended as *battle-tested production-ready* library, the binary format of 
+`BlockExtra` changed and I wanted to highlight it with major version rollout.
 
 ## Similar projects
 
