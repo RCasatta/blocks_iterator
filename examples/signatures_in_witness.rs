@@ -61,25 +61,25 @@ struct ParsedSignature {
 }
 
 impl Decodable for ParsedSignature {
-    fn consensus_decode<D: std::io::Read>(mut d: D) -> Result<Self, encode::Error> {
+    fn consensus_decode<D: std::io::Read + ?Sized>(d: &mut D) -> Result<Self, encode::Error> {
         //TODO fix for schnorr signatures!
-        let first = u8::consensus_decode(&mut d)?;
+        let first = u8::consensus_decode(d)?;
         if first != 0x30 {
             return Err(encode::Error::ParseFailed("Signature must start with 0x30"));
         }
-        let _ = u8::consensus_decode(&mut d)?;
-        let integer_header = u8::consensus_decode(&mut d)?;
+        let _ = u8::consensus_decode(d)?;
+        let integer_header = u8::consensus_decode(d)?;
         if integer_header != 0x02 {
             return Err(encode::Error::ParseFailed("No integer header"));
         }
 
-        let R = <Vec<u8>>::consensus_decode(&mut d)?;
-        let integer_header = u8::consensus_decode(&mut d)?;
+        let R = <Vec<u8>>::consensus_decode(d)?;
+        let integer_header = u8::consensus_decode(d)?;
         if integer_header != 0x02 {
             return Err(encode::Error::ParseFailed("No integer header"));
         }
-        let s = <Vec<u8>>::consensus_decode(&mut d)?;
-        let sighash_u8 = u8::consensus_decode(&mut d)?;
+        let s = <Vec<u8>>::consensus_decode(d)?;
+        let sighash_u8 = u8::consensus_decode(d)?;
         let sighash = EcdsaSighashType::from_consensus(sighash_u8 as u32);
 
         Ok(ParsedSignature {
