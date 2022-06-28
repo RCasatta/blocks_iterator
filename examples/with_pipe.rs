@@ -1,4 +1,4 @@
-use bitcoin::{BlockHash, Txid};
+use bitcoin::{hashes::Hash, BlockHash, Txid};
 use blocks_iterator::PipeIterator;
 use env_logger::Env;
 use log::{info, warn};
@@ -13,9 +13,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut total_missing_reward = 0u64;
     let mut blocks_missing_reward = 0u64;
 
-    let mut block_most_tx: (BlockHash, usize) = (BlockHash::default(), 0);
-    let mut most_output: (Txid, usize) = (Txid::default(), 0);
-    let mut heaviest: (Txid, usize) = (Txid::default(), 0);
+    let mut block_most_tx: (BlockHash, usize) = (BlockHash::all_zeros(), 0);
+    let mut most_output: (Txid, usize) = (Txid::all_zeros(), 0);
+    let mut heaviest: (Txid, usize) = (Txid::all_zeros(), 0);
 
     for block_extra in iter {
         let txs_fee = block_extra.fee().expect("launch without `--skip-prevout`");
