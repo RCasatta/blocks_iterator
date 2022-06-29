@@ -16,7 +16,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let blocks_iter = blocks_iterator::iter(config);
     let mut buffer = [0u8; MAX_VEC_SIZE];
     for block_extra in blocks_iter {
-        let size = block_extra.consensus_encode(&mut buffer[..]).unwrap();
+        let size = block_extra
+            .consensus_encode(&mut buffer[..].to_vec())
+            .unwrap();
         io::stdout().write_all(&buffer[..size])?;
     }
     info!("end");
