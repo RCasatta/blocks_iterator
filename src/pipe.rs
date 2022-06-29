@@ -38,7 +38,9 @@ impl Iterator for PipeIterator {
         if let Some(stdout) = self.stdout.as_mut() {
             // using StreamReader we can't send received bytes directly to stdout, thus we need to
             // re-serialize back
-            let len = block_extra.consensus_encode(&mut self.buffer[..]).unwrap(); // buffer is big enough, we can unwrap
+            let len = block_extra
+                .consensus_encode(&mut &mut self.buffer[..])
+                .unwrap(); // buffer is big enough, we can unwrap
             stdout.write_all(&self.buffer[..len]).unwrap();
         }
 

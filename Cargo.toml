@@ -11,7 +11,9 @@ readme = "README.md"
 license = "MIT"
 
 [dependencies]
-bitcoin =  { version = "0.28.0", features = ["use-serde"]}
+# bitcoin =  { version = "0.28.0", features = ["use-serde"]}
+bitcoin =  { git="https://github.com/dpc/rust-bitcoin", rev="1fea098dfb916d64f2ecbfb9a13b8d264020bc1e", features = ["serde"]}
+#  -rwxrwxr-x   2 casatta casatta 13736992 Jun  9 14:04 blocks_iterator
 structopt = "0.3.21"
 log = "0.4.11"
 glob = "0.3.0"
@@ -34,10 +36,14 @@ rayon = "1.5.0"
 tempfile = "3.2.0"
 
 [features]
-default = ["db", "consensus"]
+default = []
 db = ["rocksdb", "rand"]
 consensus = ["bitcoinconsensus", "bitcoin/bitcoinconsensus"]
 unstable = ["sha2", "blake3"]
+
+[[bin]]
+name = "blocks_iterator"
+required-features = ["db"]
 
 [[example]]
 name = "heaviest_pipe"
