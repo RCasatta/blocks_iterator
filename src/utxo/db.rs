@@ -48,17 +48,17 @@ impl DbUtxo {
 
 fn serialize_outpoint(o: &OutPoint, buffer: &mut [u8; 37]) {
     buffer[0] = UTXO_PREFIX;
-    o.consensus_encode(&mut buffer[1..]).unwrap();
+    o.consensus_encode(&mut buffer[1..].to_vec()).unwrap();
 }
 
 fn serialize_txout(o: &TxOut, buffer: &mut [u8; 10_011]) -> usize {
     // No need to prefix, used
-    o.consensus_encode(&mut buffer[..]).unwrap()
+    o.consensus_encode(&mut buffer[..].to_vec()).unwrap()
 }
 
 fn serialize_prevouts_height(h: i32) -> [u8; 5] {
-    let mut ser = [PREVOUTS_PREFIX, 0, 0, 0, 0];
-    h.consensus_encode(&mut ser[1..]).unwrap();
+    let ser = [PREVOUTS_PREFIX, 0, 0, 0, 0];
+    h.consensus_encode(&mut ser[1..].to_vec()).unwrap();
     ser
 }
 

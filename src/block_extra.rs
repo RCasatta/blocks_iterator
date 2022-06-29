@@ -49,8 +49,9 @@ impl TryFrom<FsBlock> for BlockExtra {
         file.seek(SeekFrom::Start(fs_block.start as u64))
             .map_err(|e| err(e.to_string(), &fs_block))?;
         debug!("going to read: {:?}", file);
-        let reader = BufReader::new(file);
-        let block = Block::consensus_decode(reader).map_err(|e| err(e.to_string(), &fs_block))?;
+        let mut reader = BufReader::new(file);
+        let block =
+            Block::consensus_decode(&mut reader).map_err(|e| err(e.to_string(), &fs_block))?;
 
         let txs = &block.txdata;
         let block_total_inputs = txs.iter().fold(0usize, |acc, tx| acc + tx.input.len());
@@ -110,56 +111,56 @@ impl BlockExtra {
 }
 
 impl Encodable for BlockExtra {
-    fn consensus_encode<W: Write>(&self, mut writer: W) -> Result<usize, std::io::Error> {
+    fn consensus_encode<W: Write>(&self, writer: &mut W) -> Result<usize, std::io::Error> {
         let mut written = 0;
-        written += self.version.consensus_encode(&mut writer)?;
-        written += self.block.consensus_encode(&mut writer)?;
-        written += self.block_hash.consensus_encode(&mut writer)?;
-        written += self.size.consensus_encode(&mut writer)?;
-        written += self.next.consensus_encode(&mut writer)?;
-        written += self.height.consensus_encode(&mut writer)?;
-        written += (self.outpoint_values.len() as u32).consensus_encode(&mut writer)?;
+        written += self.version.consensus_encode(writer)?;
+        written += self.block.consensus_encode(writer)?;
+        written += self.block_hash.consensus_encode(writer)?;
+        written += self.size.consensus_encode(writer)?;
+        written += self.next.consensus_encode(writer)?;
+        written += self.height.consensus_encode(writer)?;
+        written += (self.outpoint_values.len() as u32).consensus_encode(writer)?;
         for (out_point, tx_out) in self.outpoint_values.iter() {
-            written += out_point.consensus_encode(&mut writer)?;
-            written += tx_out.consensus_encode(&mut writer)?;
+            written += out_point.consensus_encode(writer)?;
+            written += tx_out.consensus_encode(writer)?;
         }
-        written += self.block_total_inputs.consensus_encode(&mut writer)?;
-        written += self.block_total_outputs.consensus_encode(&mut writer)?;
-        written += (self.txids.len() as u32).consensus_encode(&mut writer)?;
+        written += self.block_total_inputs.consensus_encode(writer)?;
+        written += self.block_total_outputs.consensus_encode(writer)?;
+        written += (self.txids.len() as u32).consensus_encode(writer)?;
         for txid in self.txids.iter() {
-            written += txid.consensus_encode(&mut writer)?;
+            written += txid.consensus_encode(writer)?;
         }
         Ok(written)
     }
 }
 
 impl Decodable for BlockExtra {
-    fn consensus_decode<D: Read>(mut d: D) -> Result<Self, encode::Error> {
+    fn consensus_decode<D: Read>(d: &mut D) -> Result<Self, encode::Error> {
         Ok(BlockExtra {
-            version: Decodable::consensus_decode(&mut d)?,
-            block: Decodable::consensus_decode(&mut d)?,
-            block_hash: Decodable::consensus_decode(&mut d)?,
-            size: Decodable::consensus_decode(&mut d)?,
-            next: Decodable::consensus_decode(&mut d)?,
-            height: Decodable::consensus_decode(&mut d)?,
+            version: Decodable::consensus_decode(d)?,
+            block: Decodable::consensus_decode(d)?,
+            block_hash: Decodable::consensus_decode(d)?,
+            size: Decodable::consensus_decode(d)?,
+            next: Decodable::consensus_decode(d)?,
+            height: Decodable::consensus_decode(d)?,
             outpoint_values: {
-                let len = u32::consensus_decode(&mut d)?;
+                let len = u32::consensus_decode(d)?;
                 let mut m = HashMap::with_capacity(len as usize);
                 for _ in 0..len {
                     m.insert(
-                        Decodable::consensus_decode(&mut d)?,
-                        Decodable::consensus_decode(&mut d)?,
+                        Decodable::consensus_decode(d)?,
+                        Decodable::consensus_decode(d)?,
                     );
                 }
                 m
             },
-            block_total_inputs: Decodable::consensus_decode(&mut d)?,
-            block_total_outputs: Decodable::consensus_decode(&mut d)?,
+            block_total_inputs: Decodable::consensus_decode(d)?,
+            block_total_outputs: Decodable::consensus_decode(d)?,
             txids: {
-                let len = u32::consensus_decode(&mut d)?;
+                let len = u32::consensus_decode(d)?;
                 let mut v = Vec::with_capacity(len as usize);
                 for _ in 0..len {
-                    v.push(Decodable::consensus_decode(&mut d)?);
+                    v.push(Decodable::consensus_decode(d)?);
                 }
                 v
             },
