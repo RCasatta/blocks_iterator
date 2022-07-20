@@ -40,10 +40,7 @@ consensus = ["bitcoinconsensus", "bitcoin/bitcoinconsensus"]
 unstable = ["sha2", "blake3"]
 
 [[example]]
-name = "heaviest_pipe"
-
-[[example]]
-name = "most_output_pipe"
+name = "with_pipe"
 
 [[example]]
 name = "verify"

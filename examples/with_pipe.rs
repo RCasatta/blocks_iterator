@@ -1,3 +1,4 @@
+use bitcoin::{BlockHash, Txid};
 use blocks_iterator::PipeIterator;
 use env_logger::Env;
 use log::{info, warn};
@@ -8,9 +9,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     info!("start");
 
-    let iter = PipeIterator::new(io::stdin(), Some(io::stdout()));
+    let iter = PipeIterator::new(io::stdin(), None);
     let mut total_missing_reward = 0u64;
     let mut blocks_missing_reward = 0u64;
+
+    let mut block_most_tx: (BlockHash, usize) = (BlockHash::default(), 0);
+    let mut most_output: (Txid, usize) = (Txid::default(), 0);
+    let mut heaviest: (Txid, usize) = (Txid::default(), 0);
 
     for block_extra in iter {
         let txs_fee = block_extra.fee().expect("launch without `--skip-prevout`");
@@ -32,10 +37,41 @@ fn main() -> Result<(), Box<dyn Error>> {
                 missing_reward
             );
         }
+
+        let len = block.txdata.len();
+        if len > block_most_tx.1 {
+            info!(
+                "New max number of txs: {} block: {:?}",
+                len, block_extra.block_hash
+            );
+            block_most_tx = (block_extra.block_hash, len);
+        }
+
+        for (txid, tx) in block_extra.iter_tx() {
+            if tx.output.len() > most_output.1 {
+                info!("New most_output tx: {}", txid);
+                most_output = (*txid, tx.output.len());
+            }
+            if tx.weight() > heaviest.1 {
+                info!("New heaviest tx: {}", txid);
+                heaviest = (*txid, tx.weight());
+            }
+        }
     }
+
+    info!(
+        "Max number of txs: {} block: {:?}",
+        block_most_tx.1, block_most_tx.0
+    );
+
     info!(
         "total missing reward: {} in {} blocks",
         total_missing_reward, blocks_missing_reward
+    );
+
+    info!(
+        "most_output tx is {} with #outputs: {}",
+        most_output.0, most_output.1
     );
 
     Ok(())

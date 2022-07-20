@@ -64,7 +64,7 @@ jobs:
           command: run
           args: --no-default-features --example ${{ matrix.example }} -- --blocks-dir blocks --network testnet
 
-  pipe-examples:
+  pipe-example:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -83,4 +83,4 @@ jobs:
         with:
           command: build
           args: --release --no-default-features --examples
-      - run: ./target/release/blocks_iterator --blocks-dir blocks --network testnet --max-reorg 40 | ./target/release/examples/most_output_pipe | ./target/release/examples/less_reward_pipe | ./target/release/examples/heaviest_pipe >/dev/null
+      - run: ./target/release/blocks_iterator --blocks-dir blocks --network testnet --max-reorg 40 | ./target/release/examples/with_pipe
