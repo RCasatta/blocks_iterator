@@ -80,3 +80,8 @@ The `1.0` is not to be intended as *battle-tested production-ready* library, the
 ## MSRV 
 
 Check minimum rust version run in CI (as of May 2022 is `1.56.1`)
+
+### Running benchmarks
+
+We use a custom Rust compiler configuration conditional to guard the bench mark code. To run the
+bench marks use: `RUSTFLAGS='--cfg=bench' cargo +nightly bench`.

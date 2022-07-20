@@ -178,7 +178,7 @@ mod test {
     }
 }
 
-#[cfg(all(test, feature = "unstable"))]
+#[cfg(bench)]
 mod bench {
 
     use rocksdb::{Options, WriteBatch, DB};
