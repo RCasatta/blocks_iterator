@@ -21,10 +21,6 @@ env_logger = "0.9"
 rand = { version = "0.8.4", optional = true }
 rocksdb = { version = "0.18.0", optional = true, default-features = false }
 
-# only for benching
-blake3 = { version = "1.0.0", optional = true }
-sha2 = { version = "0.10.2", optional = true, features = ["asm"] }
-
 # only for verify example
 bitcoinconsensus = { version = "0.19.0-0.4.0", optional = true }
 
@@ -32,12 +28,14 @@ rayon = "1.5.0"
 
 [dev-dependencies]
 tempfile = "3.2.0"
+blake3 = "1.0.0"
+sha2 = { version = "0.10.2",  features = ["asm"] }
+
 
 [features]
 default = ["db", "consensus"]
 db = ["rocksdb", "rand"]
 consensus = ["bitcoinconsensus", "bitcoin/bitcoinconsensus"]
-unstable = ["sha2", "blake3"]
 
 [[example]]
 name = "heaviest_pipe"

@@ -18,8 +18,9 @@
 #![deny(unused_imports)]
 #![deny(missing_docs)]
 #![deny(unused_must_use)]
-#![cfg_attr(all(test, feature = "unstable"), feature(test))]
-#[cfg(all(test, feature = "unstable"))]
+#![cfg_attr(bench, feature(test))]
+
+#[cfg(bench)]
 extern crate test;
 
 use bitcoin::BlockHash;
@@ -278,7 +279,7 @@ mod inner_test {
     }
 }
 
-#[cfg(all(test, feature = "unstable"))]
+#[cfg(bench)]
 mod bench {
     use crate::bitcoin::hashes::{sha256, Hash, HashEngine};
     use crate::bitcoin::OutPoint;
