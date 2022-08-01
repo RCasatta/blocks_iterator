@@ -9,6 +9,7 @@ documentation = "https://docs.rs/blocks_iterator/"
 keywords = ["bitcoin", "blocks", "iterate"]
 readme = "README.md"
 license = "MIT"
+default-run = "blocks_iterator"
 
 [dependencies]
 bitcoin =  { version = "0.29", features = ["serde"] }
@@ -43,6 +44,12 @@ unstable = ["sha2", "blake3"]
 [[bin]]
 name = "blocks_iterator"
 required-features = ["db"]
+
+
+[[bin]]
+name = "utxo_set"
+required-features = ["db"]
+
 
 [[example]]
 name = "with_pipe"

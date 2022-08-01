@@ -16,7 +16,7 @@
 #![deny(unused_mut)]
 // #![deny(dead_code)]
 #![deny(unused_imports)]
-#![deny(missing_docs)]
+// #![deny(missing_docs)]
 #![deny(unused_must_use)]
 #![cfg_attr(all(test, feature = "unstable"), feature(test))]
 #[cfg(all(test, feature = "unstable"))]
@@ -44,7 +44,8 @@ mod iter;
 mod period;
 mod pipe;
 mod stages;
-mod utxo;
+pub mod utxo;
+mod varint;
 
 // re-exporting deps
 pub use bitcoin;
@@ -60,6 +61,8 @@ pub use utxo::UtxoStore;
 
 #[allow(deprecated)]
 pub use iter::par_iter;
+
+pub use varint::read_true_var_int;
 
 /// Configuration parameters, most important the bitcoin blocks directory
 #[derive(StructOpt, Debug, Clone)]
