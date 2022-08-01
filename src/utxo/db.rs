@@ -2,13 +2,20 @@ use crate::bitcoin::consensus::serialize;
 use crate::bitcoin::{OutPoint, TxOut};
 use crate::utxo::UtxoStore;
 use crate::BlockExtra;
-use bitcoin::consensus::{deserialize, Encodable};
+use bitcoin::consensus::{deserialize, encode, Decodable, Encodable};
 use log::{debug, info};
-use rocksdb::{Options, WriteBatch, DB};
+use rocksdb::{
+    DBIteratorWithThreadMode, DBWithThreadMode, Direction, IteratorMode, Options, SingleThreaded,
+    WriteBatch, DB,
+};
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::io::Cursor;
 use std::path::Path;
 
+/// A struct implementing [`UtxoStore`].
+/// Contains a reference to the db with information of the updated height and the number
+/// of inserted outputs for statistic
 pub struct DbUtxo {
     db: DB,
     updated_up_to_height: i32,
@@ -25,6 +32,7 @@ const PREVOUTS_PREFIX: u8 = b'P';
 const HEIGHT_PREFIX: u8 = b'H';
 
 impl DbUtxo {
+    /// Creates a [`DbUtxo`]
     pub fn new<P: AsRef<Path>>(path: P) -> Result<DbUtxo, rocksdb::Error> {
         let mut options = Options::default();
         options.create_if_missing(true);
@@ -43,6 +51,85 @@ impl DbUtxo {
             updated_up_to_height,
             inserted_outputs: 0,
         })
+    }
+
+    /// Iterate the utxo element contained in the db returning their serialized
+    /// bytes
+    pub fn iter_utxo_bytes(&self) -> impl Iterator<Item = UtxoPairBytes> + '_ {
+        let iter = self
+            .db
+            .iterator(IteratorMode::From(&[UTXO_PREFIX], Direction::Forward));
+
+        UtxoBytesIter { iter, end: false }
+    }
+
+    /// Iterate the utxo element contained in the db returning pairs ([`OutPoint`], [`TxOut`])
+    pub fn iter_utxo(&self) -> impl Iterator<Item = (OutPoint, TxOut)> + '_ {
+        self.iter_utxo_bytes().flat_map(|el| decode_utxo_pair(&el))
+    }
+}
+
+struct UtxoBytesIter<'a> {
+    iter: DBIteratorWithThreadMode<'a, DBWithThreadMode<SingleThreaded>>,
+    end: bool,
+}
+
+/// A UTXO pair `(OutPoint, TxOut)` in their consensus serialized format.
+/// Note the out_point is prefixed by one byte
+/// This structure allows database iteration without further allocation, use [`encode_utxo_pair`] to
+/// conveniently create `OutPoint` and `TxOut`
+pub struct UtxoPairBytes {
+    prefixed_out_point: Box<[u8]>,
+    tx_out: Box<[u8]>,
+}
+
+impl UtxoPairBytes {
+    /// Returns the length of the serialized encoding of the contained [`OutPoint`] (26, fixed width)
+    /// and the [`TxOut`] (variable length)
+    pub fn serialized_len(&self) -> usize {
+        36 + self.tx_out.len()
+    }
+    /// Returns out point serialized bytes (remove the prefix from `prefixed_out_point`)
+    pub fn out_point_bytes(&self) -> &[u8] {
+        &self.prefixed_out_point[1..]
+    }
+    /// Returns tx out serialized bytes
+    pub fn tx_out_bytes(&self) -> &[u8] {
+        &self.tx_out[..]
+    }
+}
+
+/// Decode [`UtxoPairButes`] into ([`OutPoint`], [`TxOut`])
+pub fn decode_utxo_pair(utxo_pair: &UtxoPairBytes) -> Result<(OutPoint, TxOut), encode::Error> {
+    let mut out_point_cursor = Cursor::new(&utxo_pair.prefixed_out_point[1..]);
+    let mut tx_out_cursor = Cursor::new(&utxo_pair.tx_out[..]);
+
+    Ok((
+        OutPoint::consensus_decode(&mut out_point_cursor)?,
+        TxOut::consensus_decode(&mut tx_out_cursor)?,
+    ))
+}
+
+impl<'a> Iterator for UtxoBytesIter<'a> {
+    type Item = UtxoPairBytes;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.end {
+            return None;
+        }
+        if let Some((prefixed_out_point, tx_out)) = self.iter.next() {
+            if prefixed_out_point.get(0) != Some(&UTXO_PREFIX) {
+                self.end = true;
+                None
+            } else {
+                Some(UtxoPairBytes {
+                    prefixed_out_point,
+                    tx_out,
+                })
+            }
+        } else {
+            None
+        }
     }
 }
 

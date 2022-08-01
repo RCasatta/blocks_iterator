@@ -14,7 +14,7 @@
 #![deny(non_camel_case_types)]
 #![deny(non_snake_case)]
 #![deny(unused_mut)]
-#![deny(dead_code)]
+// #![deny(dead_code)]
 #![deny(unused_imports)]
 #![deny(missing_docs)]
 #![deny(unused_must_use)]
@@ -56,6 +56,7 @@ pub use structopt;
 pub use block_extra::BlockExtra;
 pub use iter::iter;
 pub use pipe::PipeIterator;
+pub use utxo::UtxoStore;
 
 #[allow(deprecated)]
 pub use iter::par_iter;

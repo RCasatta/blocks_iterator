@@ -9,8 +9,9 @@ pub use mem::MemUtxo;
 
 use bitcoin::OutPoint;
 #[cfg(feature = "db")]
-pub use db::DbUtxo;
+pub use db::{decode_utxo_pair, DbUtxo, UtxoPairBytes};
 
+/// Trait definining the `add_outputs_get_inputs` method to handle the utxo set
 pub trait UtxoStore {
     /// Add all the outputs (except provably unspenof all the transaction in the block in the `UtxoStore`
     /// Return all the prevouts in the block at `height` in the order they are found in the block.
