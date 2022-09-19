@@ -169,7 +169,7 @@ impl Decodable for BlockExtra {
 }
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use crate::bitcoin::consensus::serialize;
     use crate::bitcoin::{Block, BlockHeader, OutPoint, TxOut};
     use crate::BlockExtra;
@@ -187,7 +187,7 @@ mod test {
         assert_eq!(be, deser);
     }
 
-    fn block_extra() -> BlockExtra {
+    pub fn block_extra() -> BlockExtra {
         BlockExtra {
             version: 0,
             block: Block {
