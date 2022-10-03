@@ -14,10 +14,10 @@
 #![deny(non_camel_case_types)]
 #![deny(non_snake_case)]
 #![deny(unused_mut)]
-// #![deny(dead_code)]
+#![deny(dead_code)]
 #![deny(unused_imports)]
 #![deny(missing_docs)]
-//#![deny(unused_must_use)]
+#![deny(unused_must_use)]
 #![cfg_attr(all(test, feature = "unstable"), feature(test))]
 #[cfg(all(test, feature = "unstable"))]
 extern crate test;

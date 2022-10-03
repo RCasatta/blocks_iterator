@@ -7,7 +7,7 @@ struct BlockExtra<'a> {
 
 impl<'a> AsRef<[u8]> for BlockExtra<'a> {
     fn as_ref(&self) -> &[u8] {
-        &self.slice
+        self.slice
     }
 }
 

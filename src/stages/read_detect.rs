@@ -138,18 +138,14 @@ pub fn detect(buffer: &[u8], magic: u32) -> Result<Vec<DetectedBlock>, bitcoin_s
     // reading, more than 1 file ahead cause cache to work not efficiently)
     let mut detected_blocks = Vec::with_capacity(128);
     let mut current = buffer;
-    loop {
-        match U8::parse(current) {
-            Ok(byte) => {
-                pointer += 1;
-                current = byte.remaining();
-                rolling.push(byte.parsed().into());
-                if magic != rolling.as_u32() {
-                    continue;
-                }
-            }
-            Err(_) => break, // EOF
-        };
+    while let Ok(byte) = U8::parse(current) {
+        pointer += 1;
+        current = byte.remaining();
+        rolling.push(byte.parsed().into());
+        if magic != rolling.as_u32() {
+            continue;
+        }
+
         let size = U32::parse(current)?;
         let remaining = size.remaining();
         let size: u32 = size.parsed().into();
@@ -161,8 +157,7 @@ pub fn detect(buffer: &[u8], magic: u32) -> Result<Vec<DetectedBlock>, bitcoin_s
                 current = block.remaining();
                 let end = pointer;
                 let hash = BlockHash::from_slice(&block.parsed().block_hash_sha2()[..]).unwrap();
-                let prev =
-                    BlockHash::from_slice(&block.parsed().header().prev_blockhash()[..]).unwrap();
+                let prev = BlockHash::from_slice(block.parsed().header().prev_blockhash()).unwrap();
                 if size as usize != end - start {
                     continue;
                 }
