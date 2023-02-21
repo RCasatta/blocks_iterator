@@ -175,16 +175,16 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
 
         let (send_blocks_with_txids, receive_blocks_with_txids) =
             sync_channel(config.channels_size.into());
-        let (start_at_height, send_blocks_with_txids) = if config.skip_prevout {
+        let send_blocks_with_txids = if config.skip_prevout {
             // if skip_prevout is true, we send directly to end step
-            (config.start_at_height, channel.clone())
+            channel.clone()
         } else {
-            // `start_height = 0`: we cannot skip sending blocks to the fee stage because of the computation of the utxo
-            (0, send_blocks_with_txids)
+            send_blocks_with_txids
         };
 
         let _compute_txids = stages::ComputeTxids::new(
-            start_at_height,
+            config.skip_prevout,
+            config.start_at_height,
             receive_ordered_blocks,
             send_blocks_with_txids,
         );

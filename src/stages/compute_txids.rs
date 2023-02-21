@@ -22,6 +22,7 @@ impl Drop for ComputeTxids {
 
 impl ComputeTxids {
     pub fn new(
+        skip_prevout: bool,
         start_at_height: u32,
         receiver: Receiver<Option<BlockExtra>>,
         sender: SyncSender<Option<BlockExtra>>,
@@ -41,7 +42,8 @@ impl ComputeTxids {
                     now = Instant::now();
                     match received {
                         Some(mut block_extra) => {
-                            if block_extra.height >= start_at_height {
+                            if !skip_prevout || block_extra.height >= start_at_height {
+                                // always send if we are not skipping prevouts, otherwise only if height is enough
                                 block_extra.compute_txids(&pool);
                                 busy_time += now.elapsed();
                                 sender.send(Some(block_extra)).unwrap();
