@@ -1,13 +1,12 @@
+use crate::bitcoin::consensus::Decodable;
 use crate::bitcoin::{BlockHash, Network};
 use crate::{FsBlock, Periodic};
-use bitcoin::hashes::Hash;
-use bitcoin_slices::number::{U32, U8};
-use bitcoin_slices::{bsl, Parse};
-use log::info;
+use bitcoin::{BlockHeader, Error, Transaction, VarInt};
+use log::{error, info};
 use std::collections::HashSet;
 use std::convert::TryInto;
 use std::fs::File;
-use std::io::Read;
+use std::io::{BufReader, Read, Seek};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::SyncSender;
@@ -68,7 +67,6 @@ impl ReadDetect {
         sender: SyncSender<Option<Vec<FsBlock>>>,
     ) -> Self {
         let mut periodic = Periodic::new(Duration::from_secs(60));
-        let mut vec = Vec::with_capacity(135_000_000);
         Self {
             join: Some(std::thread::spawn(move || {
                 info!("starting read_detect");
@@ -87,11 +85,10 @@ impl ReadDetect {
                 let mut busy_time = 0u128;
 
                 for path in paths.into_iter() {
-                    let mut file = File::open(&path).unwrap();
-                    file.read_to_end(&mut vec).unwrap();
-                    let detected_blocks = detect(&vec, network.magic()).unwrap();
-                    vec.clear();
-                    drop(file);
+                    let file = File::open(&path).unwrap();
+                    let mut reader = BufReader::new(file);
+                    let detected_blocks = detect(&mut reader, network.magic()).unwrap();
+                    drop(reader);
 
                     let file = File::open(&path).unwrap();
                     let file = Arc::new(Mutex::new(file));
@@ -129,48 +126,58 @@ impl ReadDetect {
     }
 }
 
-pub fn detect(buffer: &[u8], magic: u32) -> Result<Vec<DetectedBlock>, bitcoin_slices::Error> {
-    let mut pointer = 0usize;
+pub fn detect<R: Read + Seek>(mut reader: &mut R, magic: u32) -> Result<Vec<DetectedBlock>, Error> {
     let mut rolling = RollingU32::default();
 
     // Instead of sending DetecetdBlock on the channel directly, we quickly insert in the vector
     // allowing to read ahead exactly one file (reading no block ahead cause non-parallelizing
     // reading, more than 1 file ahead cause cache to work not efficiently)
     let mut detected_blocks = Vec::with_capacity(128);
-    let mut current = buffer;
-    while let Ok(byte) = U8::parse(current) {
-        pointer += 1;
-        current = byte.remaining();
-        rolling.push(byte.parsed().into());
-        if magic != rolling.as_u32() {
-            continue;
-        }
 
-        let size = U32::parse(current)?;
-        let remaining = size.remaining();
-        let size: u32 = size.parsed().into();
-        pointer += 4;
-        let start = pointer;
-        match bsl::Block::parse(remaining) {
-            Ok(block) => {
-                pointer += block.consumed();
-                current = block.remaining();
-                let end = pointer;
-                let hash = BlockHash::from_slice(&block.parsed().block_hash_sha2()[..]).unwrap();
-                let prev = BlockHash::from_slice(block.parsed().header().prev_blockhash()).unwrap();
+    loop {
+        match u8::consensus_decode(&mut reader) {
+            Ok(value) => {
+                rolling.push(value);
+                if magic != rolling.as_u32() {
+                    continue;
+                }
+            }
+            Err(_) => break, // EOF
+        };
+        let size = u32::consensus_decode(&mut reader)?;
+        let start = reader.stream_position().unwrap() as usize;
+        match BlockHeader::consensus_decode(&mut reader) {
+            Ok(block_header) => {
+                // Instead of parsing a block which is unneeded at this stage
+                // we just seek over transactions to avoid full Block allocation
+                let n_txs = match VarInt::consensus_decode(&mut reader) {
+                    Ok(v) => v.0,
+                    Err(_) => continue,
+                };
+                for _ in 0..n_txs {
+                    if Transaction::consensus_decode(&mut reader).is_err() {
+                        continue;
+                    }
+                }
+                let end = reader.stream_position().unwrap() as usize;
                 if size as usize != end - start {
                     continue;
                 }
-
+                let hash = block_header.block_hash();
                 let detected_block = DetectedBlock {
                     start,
                     end,
                     hash,
-                    prev,
+                    prev: block_header.prev_blockhash,
                 };
                 detected_blocks.push(detected_block);
             }
-            Err(_) => continue,
+            Err(e) => {
+                // It's mandatory to use stream_position (require MSRV 1.51) because I can't maintain
+                // a byte read position because in case of error I don't know how many bytes of the
+                // reader has been consumed
+                error!("error block header parsing {:?}", e)
+            }
         }
     }
     Ok(detected_blocks)

@@ -39,7 +39,6 @@ use utxo::AnyUtxo;
 pub use period::{PeriodCounter, Periodic};
 
 mod block_extra;
-mod bsl;
 mod iter;
 mod period;
 mod pipe;
