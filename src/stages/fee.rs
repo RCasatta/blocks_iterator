@@ -21,7 +21,6 @@ impl Drop for Fee {
 
 impl Fee {
     pub fn new<T: 'static + UtxoStore + Send>(
-        start_at_height: u32,
         receiver: Receiver<Option<BlockExtra>>,
         sender: SyncSender<Option<BlockExtra>>,
         mut utxo: T,
@@ -91,9 +90,8 @@ impl Fee {
                             );
 
                             busy_time += now.elapsed().as_nanos();
-                            if block_extra.height >= start_at_height {
-                                sender.send(Some(block_extra)).unwrap();
-                            }
+                            sender.send(Some(block_extra)).unwrap();
+
                             now = Instant::now();
                         }
                         None => break,

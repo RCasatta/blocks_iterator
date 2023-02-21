@@ -94,7 +94,6 @@ impl Reorder {
     pub fn new(
         network: Network,
         max_reorg: u8,
-        start_at_height: u32,
         stop_at_height: Option<u32>,
         early_stop: Arc<AtomicBool>,
         receiver: Receiver<Option<Vec<FsBlock>>>,
@@ -165,9 +164,8 @@ impl Reorder {
                                         );
                                         info!("{}", stats);
                                     }
-                                    if block_extra.height >= start_at_height {
-                                        sender.send(Some(block_extra)).unwrap();
-                                    }
+                                    sender.send(Some(block_extra)).unwrap();
+
                                     height += 1;
                                     now = Instant::now();
                                     last_height = height;

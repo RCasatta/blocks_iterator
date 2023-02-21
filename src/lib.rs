@@ -95,8 +95,8 @@ pub struct Config {
     /// Start the blocks iteration at the specified height, note blocks*.dat file are read and
     /// analyzed anyway to follow the blockchain starting at the genesis and populate utxos,
     /// however they are not emitted
-    #[structopt(long, default_value = "0")]
-    pub start_at_height: u32,
+    // #[structopt(long, default_value = "0")]
+    // pub start_at_height: u32,
 
     /// Stop the blocks iteration at the specified height
     #[structopt(long)]
@@ -167,7 +167,6 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
         let _reorder = stages::Reorder::new(
             config.network,
             config.max_reorg,
-            config.start_at_height,
             config.stop_at_height,
             early_stop,
             receive_block_fs,
@@ -186,12 +185,7 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
             stages::ComputeTxids::new(receive_ordered_blocks, send_blocks_with_txids);
 
         if !config.skip_prevout {
-            let _fee = stages::Fee::new(
-                config.start_at_height,
-                receive_blocks_with_txids,
-                channel,
-                config.utxo_manager(),
-            );
+            let _fee = stages::Fee::new(receive_blocks_with_txids, channel, config.utxo_manager());
         }
 
         info!("Total time elapsed: {}s", now.elapsed().as_secs());
@@ -223,7 +217,7 @@ mod inner_test {
             channels_size: 0,
             #[cfg(feature = "db")]
             utxo_db: None,
-            start_at_height: 0,
+            // start_at_height: 0,
             stop_at_height: None,
         }
     }

@@ -126,7 +126,7 @@ mod inner_test {
             channels_size: 0,
             #[cfg(feature = "db")]
             utxo_db: None,
-            start_at_height: 0,
+            // start_at_height: 0,
             stop_at_height: None,
         }
     }
@@ -147,7 +147,7 @@ mod inner_test {
     fn test_start_stop() {
         let _ = env_logger::try_init();
         let mut conf = test_conf();
-        conf.start_at_height = 2;
+        // conf.start_at_height = 2;
         conf.stop_at_height = Some(10);
 
         let mut iter = iter(conf);
