@@ -21,13 +21,14 @@ impl Drop for Fee {
 
 impl Fee {
     pub fn new<T: 'static + UtxoStore + Send>(
+        start_at_height: u32,
         receiver: Receiver<Option<BlockExtra>>,
         sender: SyncSender<Option<BlockExtra>>,
         mut utxo: T,
     ) -> Self {
         Self {
             join: Some(std::thread::spawn(move || {
-                info!("starting fee processer");
+                info!("starting fee processer. start_at_height:{start_at_height}");
                 let mut now = Instant::now();
                 let mut busy_time = 0u128;
                 let mut total_txs = 0u64;
@@ -45,54 +46,57 @@ impl Fee {
 
                             let mut prevouts =
                                 utxo.add_outputs_get_inputs(&block_extra, block_extra.height);
-                            let mut prevouts = prevouts.drain(..);
 
-                            for tx in block_extra.block.txdata.iter().skip(1) {
-                                for input in tx.input.iter() {
-                                    let previous_txout = prevouts.next().unwrap();
+                            if block_extra.height >= start_at_height {
+                                let mut prevouts = prevouts.drain(..);
 
-                                    block_extra
-                                        .outpoint_values
-                                        .insert(input.previous_output, previous_txout);
+                                for tx in block_extra.block.txdata.iter().skip(1) {
+                                    for input in tx.input.iter() {
+                                        let previous_txout = prevouts.next().unwrap();
+
+                                        block_extra
+                                            .outpoint_values
+                                            .insert(input.previous_output, previous_txout);
+                                    }
                                 }
-                            }
-                            let coin_base_output_value = block_extra.block.txdata[0]
-                                .output
-                                .iter()
-                                .map(|el| el.value)
-                                .sum();
-                            block_extra.outpoint_values.insert(
-                                OutPoint::default(),
-                                TxOut {
-                                    script_pubkey: Script::new(),
-                                    value: coin_base_output_value,
-                                },
-                            );
+                                let coin_base_output_value = block_extra.block.txdata[0]
+                                    .output
+                                    .iter()
+                                    .map(|el| el.value)
+                                    .sum();
+                                block_extra.outpoint_values.insert(
+                                    OutPoint::default(),
+                                    TxOut {
+                                        script_pubkey: Script::new(),
+                                        value: coin_base_output_value,
+                                    },
+                                );
 
-                            if periodic.elapsed() {
-                                info!("{}", utxo.stat());
-                                info!(
-                                    "# {:7} {} fee: {:?}",
+                                if periodic.elapsed() {
+                                    info!("{}", utxo.stat());
+                                    info!(
+                                        "# {:7} {} fee: {:?}",
+                                        block_extra.height,
+                                        block_extra.block_hash,
+                                        block_extra.fee()
+                                    );
+                                }
+
+                                debug!(
+                                    "#{:>6} {} size:{:>7} txs:{:>4} total_txs:{:>9} fee:{:?}",
                                     block_extra.height,
                                     block_extra.block_hash,
-                                    block_extra.fee()
+                                    block_extra.size,
+                                    block_extra.block.txdata.len(),
+                                    total_txs,
+                                    block_extra.fee(),
                                 );
+
+                                busy_time += now.elapsed().as_nanos();
+
+                                sender.send(Some(block_extra)).unwrap();
+                                now = Instant::now();
                             }
-
-                            debug!(
-                                "#{:>6} {} size:{:>7} txs:{:>4} total_txs:{:>9} fee:{:?}",
-                                block_extra.height,
-                                block_extra.block_hash,
-                                block_extra.size,
-                                block_extra.block.txdata.len(),
-                                total_txs,
-                                block_extra.fee(),
-                            );
-
-                            busy_time += now.elapsed().as_nanos();
-                            sender.send(Some(block_extra)).unwrap();
-
-                            now = Instant::now();
                         }
                         None => break,
                     }

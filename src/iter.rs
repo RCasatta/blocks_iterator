@@ -126,7 +126,7 @@ mod inner_test {
             channels_size: 0,
             #[cfg(feature = "db")]
             utxo_db: None,
-            // start_at_height: 0,
+            start_at_height: 0,
             stop_at_height: None,
         }
     }
@@ -147,19 +147,23 @@ mod inner_test {
     fn test_start_stop() {
         let _ = env_logger::try_init();
         let mut conf = test_conf();
-        // conf.start_at_height = 2;
+        conf.start_at_height = 2;
         conf.stop_at_height = Some(10);
 
-        let mut iter = iter(conf);
+        for _ in 0..2 {
+            let mut iter = iter(conf.clone());
 
-        assert_eq!(
-            "000000006c02c8ea6e4ff69651f7fcde348fb9d557a06e6957b65552002a7820",
-            iter.next().unwrap().block_hash.to_string()
-        );
+            assert_eq!(
+                "000000006c02c8ea6e4ff69651f7fcde348fb9d557a06e6957b65552002a7820",
+                iter.next().unwrap().block_hash.to_string()
+            );
 
-        assert_eq!(
-            "00000000700e92a916b46b8b91a14d1303d5d91ef0b09eecc3151fb958fd9a2e",
-            iter.last().unwrap().block_hash.to_string()
-        );
+            assert_eq!(
+                "00000000700e92a916b46b8b91a14d1303d5d91ef0b09eecc3151fb958fd9a2e",
+                iter.last().unwrap().block_hash.to_string()
+            );
+
+            conf.skip_prevout = true;
+        }
     }
 }

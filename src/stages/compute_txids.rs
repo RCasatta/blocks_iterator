@@ -22,6 +22,7 @@ impl Drop for ComputeTxids {
 
 impl ComputeTxids {
     pub fn new(
+        start_at_height: u32,
         receiver: Receiver<Option<BlockExtra>>,
         sender: SyncSender<Option<BlockExtra>>,
     ) -> Self {
@@ -40,10 +41,12 @@ impl ComputeTxids {
                     now = Instant::now();
                     match received {
                         Some(mut block_extra) => {
-                            block_extra.compute_txids(&pool);
-                            busy_time += now.elapsed();
-                            sender.send(Some(block_extra)).unwrap();
-                            now = Instant::now();
+                            if block_extra.height >= start_at_height {
+                                block_extra.compute_txids(&pool);
+                                busy_time += now.elapsed();
+                                sender.send(Some(block_extra)).unwrap();
+                                now = Instant::now();
+                            }
                         }
                         None => break,
                     }

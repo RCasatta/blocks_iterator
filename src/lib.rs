@@ -95,8 +95,8 @@ pub struct Config {
     /// Start the blocks iteration at the specified height, note blocks*.dat file are read and
     /// analyzed anyway to follow the blockchain starting at the genesis and populate utxos,
     /// however they are not emitted
-    // #[structopt(long, default_value = "0")]
-    // pub start_at_height: u32,
+    #[structopt(long, default_value = "0")]
+    pub start_at_height: u32,
 
     /// Stop the blocks iteration at the specified height
     #[structopt(long)]
@@ -175,17 +175,27 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
 
         let (send_blocks_with_txids, receive_blocks_with_txids) =
             sync_channel(config.channels_size.into());
-        let send_blocks_with_txids = if config.skip_prevout {
+        let (start_at_height, send_blocks_with_txids) = if config.skip_prevout {
             // if skip_prevout is true, we send directly to end step
-            channel.clone()
+            (config.start_at_height, channel.clone())
         } else {
-            send_blocks_with_txids
+            // `start_height = 0`: we cannot skip sending blocks to the fee stage because of the computation of the utxo
+            (0, send_blocks_with_txids)
         };
-        let _compute_txids =
-            stages::ComputeTxids::new(receive_ordered_blocks, send_blocks_with_txids);
+
+        let _compute_txids = stages::ComputeTxids::new(
+            start_at_height,
+            receive_ordered_blocks,
+            send_blocks_with_txids,
+        );
 
         if !config.skip_prevout {
-            let _fee = stages::Fee::new(receive_blocks_with_txids, channel, config.utxo_manager());
+            let _fee = stages::Fee::new(
+                config.start_at_height,
+                receive_blocks_with_txids,
+                channel,
+                config.utxo_manager(),
+            );
         }
 
         info!("Total time elapsed: {}s", now.elapsed().as_secs());
@@ -217,7 +227,7 @@ mod inner_test {
             channels_size: 0,
             #[cfg(feature = "db")]
             utxo_db: None,
-            // start_at_height: 0,
+            start_at_height: 0,
             stop_at_height: None,
         }
     }
