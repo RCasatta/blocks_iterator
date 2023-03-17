@@ -2,39 +2,50 @@ use crate::bitcoin::consensus::serialize;
 use crate::bitcoin::{OutPoint, TxOut};
 use crate::utxo::UtxoStore;
 use crate::BlockExtra;
-use bitcoin::consensus::{deserialize, Encodable};
+use bitcoin::consensus::deserialize;
+use bitcoin_slices::redb::{self, Database, ReadableTable, TableDefinition};
+use bitcoin_slices::{bsl, Parse};
 use log::{debug, info};
-use rocksdb::{Options, WriteBatch, DB};
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::path::Path;
 
 pub struct DbUtxo {
-    db: DB,
+    db: Database,
     updated_up_to_height: i32,
     inserted_outputs: u64,
 }
 
-/// This prefix contains currently unspent transaction outputs.
-const UTXO_PREFIX: u8 = b'U';
+/// This table contains currently (up to the height defined in INTS_TABLE) unspent transaction outputs.
+const UTXOS_TABLE: TableDefinition<bsl::OutPoint, bsl::TxOut> = TableDefinition::new("utxos");
 
-/// This prefix contains all prevouts of a given block.
-const PREVOUTS_PREFIX: u8 = b'P';
+/// This table contains all prevouts of a given block.
+const PREVOUTS_TABLE: TableDefinition<i32, bsl::TxOuts> = TableDefinition::new("prevouts");
 
-/// This prefix contains the height meanint the db updated up to this.
-const HEIGHT_PREFIX: u8 = b'H';
+/// This table contains the height meaning the db updated up to this.
+const INTS_TABLE: TableDefinition<&str, i32> = TableDefinition::new("ints");
 
 impl DbUtxo {
-    pub fn new<P: AsRef<Path>>(path: P) -> Result<DbUtxo, rocksdb::Error> {
-        let mut options = Options::default();
-        options.create_if_missing(true);
-        let db = DB::open(&options, path)?;
+    pub fn new<P: AsRef<Path>>(path: P) -> Result<DbUtxo, redb::Error> {
+        let db = Database::create(path)?;
 
-        let updated_up_to_height = db
-            .get(&[HEIGHT_PREFIX])?
-            .map(|e| e.try_into().unwrap())
-            .map(i32::from_ne_bytes)
-            .unwrap_or(-1);
+        let tables: Vec<_> = {
+            let read_txn = db.begin_read()?;
+            read_txn.list_tables()?.collect()
+        };
+        if tables.len() != 3 {
+            let write_txn = db.begin_write()?;
+            write_txn.open_table(UTXOS_TABLE)?;
+            write_txn.open_table(PREVOUTS_TABLE)?;
+            write_txn.open_table(INTS_TABLE)?;
+            write_txn.commit()?;
+        }
+
+        let updated_up_to_height = {
+            let read_txn = db.begin_read()?;
+            let table = read_txn.open_table(INTS_TABLE)?;
+            let result = table.get("height")?;
+            result.map(|a| a.value()).unwrap_or(-1)
+        };
 
         info!("DB updated_height: {}", updated_up_to_height);
 
@@ -46,27 +57,13 @@ impl DbUtxo {
     }
 }
 
-fn serialize_outpoint(o: &OutPoint, buffer: &mut [u8; 37]) {
-    buffer[0] = UTXO_PREFIX;
-    o.consensus_encode(&mut &mut buffer[1..]).unwrap();
-}
-
-fn serialize_txout(o: &TxOut, buffer: &mut [u8; 10_011]) -> usize {
-    // No need to prefix, used
-    o.consensus_encode(&mut &mut buffer[..]).unwrap()
-}
-
-fn serialize_prevouts_height(h: i32) -> [u8; 5] {
-    let mut ser = [PREVOUTS_PREFIX, 0, 0, 0, 0];
-    h.consensus_encode(&mut &mut ser[1..]).unwrap();
-    ser
-}
-
 impl UtxoStore for DbUtxo {
     fn add_outputs_get_inputs(&mut self, block_extra: &BlockExtra, height: u32) -> Vec<TxOut> {
         let block = &block_extra.block;
-        let mut outpoint_buffer = [0u8; 37]; // prefix(1) + txid (32) + vout (4)
-        let mut txout_buffer = [0u8; 10_011]; // max(script) (10_000) +  max(varint) (3) + value (8)  (there are exceptions, see where used)
+        // let mut outpoint_buffer = [0u8; 36]; // txid (32) + vout (4)
+
+        // max script size for spendable output is 10k https://bitcoin.stackexchange.com/a/35881/6693 ...
+        // let mut txout_buffer = [0u8; 10_011]; // max(script) (10_000) +  max(varint) (3) + value (8)  (there are exceptions, see where used)
 
         let height = height as i32;
         debug!(
@@ -88,64 +85,82 @@ impl UtxoStore for DbUtxo {
 
             let total_inputs = block.txdata.iter().skip(1).map(|e| e.input.len()).sum();
             let mut prevouts = Vec::with_capacity(total_inputs);
-            let mut batch = WriteBatch::default();
-            for tx in block.txdata.iter().skip(1) {
-                for input in tx.input.iter() {
-                    //...then we first check if inputs spend output created in this block
-                    match block_outputs.remove(&input.previous_output) {
-                        Some(tx_out) => {
-                            // we avoid touching the db entirely if it's spent in the same block
-                            prevouts.push(tx_out.clone())
-                        }
-                        None => {
-                            serialize_outpoint(&input.previous_output, &mut outpoint_buffer);
-                            let tx_out = deserialize(
-                                &self.db.get_pinned(&outpoint_buffer).unwrap().unwrap(),
-                            )
-                            .unwrap();
-                            batch.delete(&outpoint_buffer);
-                            prevouts.push(tx_out);
+            let mut to_delete = Vec::with_capacity(total_outputs);
+
+            {
+                let read_txn = self.db.begin_read().unwrap();
+                let utxos_table = read_txn.open_table(UTXOS_TABLE).unwrap();
+
+                for tx in block.txdata.iter().skip(1) {
+                    for input in tx.input.iter() {
+                        //...then we first check if inputs spend output created in this block
+                        match block_outputs.remove(&input.previous_output) {
+                            Some(tx_out) => {
+                                // we avoid touching the db entirely if it's spent in the same block
+                                prevouts.push(tx_out.clone())
+                            }
+                            None => {
+                                let outpoint_bytes = serialize(&input.previous_output);
+                                let out_point = bsl::OutPoint::parse(&outpoint_bytes)
+                                    .unwrap()
+                                    .parsed_owned();
+
+                                let tx_out_slice = utxos_table.get(&out_point).unwrap().unwrap();
+                                let tx_out = deserialize(tx_out_slice.value().as_ref()).unwrap();
+
+                                to_delete.push(outpoint_bytes);
+                                prevouts.push(tx_out);
+                            }
                         }
                     }
                 }
             }
 
-            // and we put all the remaining outputs in db
-            for (k, v) in block_outputs.drain() {
-                serialize_outpoint(&k, &mut outpoint_buffer);
-                if v.script_pubkey.len() <= 10_000 {
-                    // max script size for spendable output is 10k https://bitcoin.stackexchange.com/a/35881/6693 ...
-                    let used = serialize_txout(v, &mut txout_buffer);
-                    batch.put(&outpoint_buffer[..], &txout_buffer[..used]);
-                } else {
-                    // ... however there are bigger unspendable output like testnet 73e64e38faea386c88a578fd1919bcdba3d0b3af7b6302bf6ee1b423dc4e4333:0
-                    // this rare case are handled separately here, this is less perfomant because `serialize` allocates a vector
-                    info!(
-                        "script len > 10_000: {} outpoint:{:?}",
-                        v.script_pubkey.len(),
-                        k
-                    );
-                    batch.put(&outpoint_buffer[..], &serialize(&v));
+            let write_txn = self.db.begin_write().unwrap();
+            {
+                let mut utxos_table = write_txn.open_table(UTXOS_TABLE).unwrap();
+
+                for el in to_delete {
+                    let out_point = bsl::OutPoint::parse(&el).unwrap().parsed_owned();
+                    utxos_table.remove(out_point).unwrap();
                 }
-                self.inserted_outputs += 1;
+
+                // and we put all the remaining outputs in db
+                for (k, v) in block_outputs.drain() {
+                    let tx_out_bytes = serialize(&v);
+                    let tx_out = bsl::TxOut::parse(&tx_out_bytes).unwrap().parsed_owned();
+                    let out_point_bytes = serialize(&k);
+                    let out_point = bsl::OutPoint::parse(&out_point_bytes)
+                        .unwrap()
+                        .parsed_owned();
+
+                    utxos_table.insert(out_point, tx_out).unwrap();
+
+                    self.inserted_outputs += 1;
+                }
+                if !prevouts.is_empty() {
+                    // TODO consider compress this value serialized prevouts
+                    let mut prevouts_table = write_txn.open_table(PREVOUTS_TABLE).unwrap();
+                    let tx_outs_bytes = serialize(&prevouts);
+                    let tx_outs = bsl::TxOuts::parse(&tx_outs_bytes).unwrap().parsed_owned();
+
+                    prevouts_table.insert(height, tx_outs).unwrap();
+                }
+                let mut prevouts_table = write_txn.open_table(INTS_TABLE).unwrap();
+
+                prevouts_table.insert("height", height).unwrap();
             }
-            if !prevouts.is_empty() {
-                // TODO consider compress this value serialized prevouts
-                batch.put(serialize_prevouts_height(height), serialize(&prevouts));
-            }
-            batch.put(&[HEIGHT_PREFIX], height.to_ne_bytes());
-            self.db.write(batch).unwrap(); // TODO unwrap
+            write_txn.commit().unwrap();
             prevouts
         } else {
             if block.txdata.len() == 1 {
                 // avoid hitting disk when we have only the coinbase (no prevouts!)
                 Vec::new()
             } else {
-                self.db
-                    .get_pinned(serialize_prevouts_height(height))
-                    .unwrap()
-                    .map(|e| deserialize(&e).unwrap())
-                    .unwrap()
+                let read_txn = self.db.begin_read().unwrap();
+                let prevouts_table = read_txn.open_table(PREVOUTS_TABLE).unwrap();
+                let tx_outs = prevouts_table.get(height).unwrap().unwrap();
+                deserialize(tx_outs.value().as_ref()).unwrap()
             }
         }
     }

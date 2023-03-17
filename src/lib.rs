@@ -86,7 +86,6 @@ pub struct Config {
     #[structopt(short, long, default_value = "0")]
     pub channels_size: u8,
 
-    #[cfg(feature = "db")]
     /// Specify a directory where a database will be created to store the Utxo (when `--skip-prevout` is not used)
     /// Reduce the memory requirements but it's slower and use disk space
     #[structopt(short, long)]
@@ -104,11 +103,6 @@ pub struct Config {
 }
 
 impl Config {
-    #[cfg(not(feature = "db"))]
-    fn utxo_manager(&self) -> AnyUtxo {
-        AnyUtxo::Mem(utxo::MemUtxo::new(self.network))
-    }
-    #[cfg(feature = "db")]
     fn utxo_manager(&self) -> AnyUtxo {
         match &self.utxo_db {
             Some(path) => AnyUtxo::Db(utxo::DbUtxo::new(path).unwrap()), //TODO unwrap
@@ -225,7 +219,6 @@ mod inner_test {
             skip_prevout: false,
             max_reorg: 10,
             channels_size: 0,
-            #[cfg(feature = "db")]
             utxo_db: None,
             start_at_height: 0,
             stop_at_height: None,
@@ -248,7 +241,6 @@ mod inner_test {
         handle.join().unwrap();
     }
 
-    #[cfg(feature = "db")]
     #[test]
     fn test_blk_testnet_db() {
         let _ = env_logger::try_init();

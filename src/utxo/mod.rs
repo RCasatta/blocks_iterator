@@ -1,14 +1,11 @@
 use crate::{bitcoin::TxOut, BlockExtra};
 
-mod mem;
-
-#[cfg(feature = "db")]
 mod db;
+mod mem;
 
 pub use mem::MemUtxo;
 
 use bitcoin::OutPoint;
-#[cfg(feature = "db")]
 pub use db::DbUtxo;
 
 pub trait UtxoStore {
@@ -27,7 +24,6 @@ trait Hash64 {
 }
 
 pub enum AnyUtxo {
-    #[cfg(feature = "db")]
     Db(db::DbUtxo),
     Mem(MemUtxo),
 }
@@ -35,7 +31,6 @@ pub enum AnyUtxo {
 impl UtxoStore for AnyUtxo {
     fn add_outputs_get_inputs(&mut self, block_extra: &BlockExtra, height: u32) -> Vec<TxOut> {
         match self {
-            #[cfg(feature = "db")]
             AnyUtxo::Db(db) => db.add_outputs_get_inputs(block_extra, height),
             AnyUtxo::Mem(mem) => mem.add_outputs_get_inputs(block_extra, height),
         }
@@ -43,7 +38,6 @@ impl UtxoStore for AnyUtxo {
 
     fn stat(&self) -> String {
         match self {
-            #[cfg(feature = "db")]
             AnyUtxo::Db(db) => db.stat(),
             AnyUtxo::Mem(mem) => mem.stat(),
         }

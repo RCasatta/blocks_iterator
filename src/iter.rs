@@ -124,7 +124,6 @@ mod inner_test {
             skip_prevout: false,
             max_reorg: 10,
             channels_size: 0,
-            #[cfg(feature = "db")]
             utxo_db: None,
             start_at_height: 0,
             stop_at_height: None,
