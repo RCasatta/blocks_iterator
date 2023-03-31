@@ -153,18 +153,7 @@ mod inner_test {
     use std::sync::mpsc::sync_channel;
 
     pub fn test_conf() -> Config {
-        Config {
-            blocks_dir: "blocks".into(),
-            network: Network::Testnet,
-            skip_prevout: false,
-            max_reorg: 10,
-            channels_size: 0,
-            #[cfg(feature = "db")]
-            utxo_db: None,
-            start_at_height: 0,
-            stop_at_height: None,
-            utxo_redb: None,
-        }
+        Config::new("blocks", Network::Testnet)
     }
 
     #[test]
@@ -207,7 +196,7 @@ mod inner_test {
                 assert_eq!(*txid, tx.txid());
             }
         }
-        assert_eq!(max_height, 390);
+        assert_eq!(max_height, 400 - conf.max_reorg as u32);
 
         // iterating twice, this time prevouts come directly from db
         for b in super::iter(conf) {

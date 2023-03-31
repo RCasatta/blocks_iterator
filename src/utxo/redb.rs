@@ -201,7 +201,7 @@ mod test {
                 assert_eq!(*txid, tx.txid());
             }
         }
-        assert_eq!(max_height, 390);
+        assert_eq!(max_height, 400 - conf.max_reorg as u32);
 
         // iterating twice, this time prevouts come directly from db
         for b in iter(conf) {
