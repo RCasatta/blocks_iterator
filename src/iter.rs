@@ -115,22 +115,7 @@ mod inner_test {
 
     use super::*;
     use crate::bitcoin::Network;
-    use crate::Config;
-
-    fn test_conf() -> Config {
-        Config {
-            blocks_dir: "blocks".into(),
-            network: Network::Testnet,
-            skip_prevout: false,
-            max_reorg: 10,
-            channels_size: 0,
-            #[cfg(feature = "db")]
-            utxo_db: None,
-            start_at_height: 0,
-            stop_at_height: None,
-            utxo_redb: None,
-        }
-    }
+    use crate::inner_test::test_conf;
 
     #[test]
     fn test_iter() {

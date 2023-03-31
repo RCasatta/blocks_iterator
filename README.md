@@ -7,23 +7,29 @@
 Iterates over Bitcoin blocks, decoding data inside Bitcoin Core's blocks directory.
 
 Features:
-* Blocks are returned in height order, it avoids following reorgs (see `max_reorg` parameter)
-* Blocks come with [metadata](https://docs.rs/blocks_iterator/latest/blocks_iterator/struct.BlockExtra.html) like all block's previous outputs, it allows computing transactions fee or [verifying](examples/verify.rs) scripts in the blockchain.
+* Blocks are returned in height order, it avoids following reorgs (see [`Config::max_reorg`] parameter)
+* Blocks come with extra data [`BlockExtra`] like all block's previous outputs, it allows computing 
+transactions fee or [verifying](https://github.com/RCasatta/blocks_iterator/blob/master/examples/verify.rs) 
+scripts in the blockchain.
 
 ## Iteration modes
 
 ### In rust programs
 
-Used as a library blocks could be iterated via the [`blocks_iterator::iter`](https://docs.rs/blocks_iterator/latest/blocks_iterator/fn.iter.html) method like done in [outputs_versions](examples/outputs_versions.rs) example.
+Used as a library blocks could be iterated via the [`iter()`] method like done in 
+[outputs_versions](https://github.com/RCasatta/blocks_iterator/blob/master/examples/outputs_versions.rs) 
+example.
 
-When the task to be performed is computational costly, like verifying spending conditions, it is suggested to parallelize the execution like it's done with rayon
-(or similar) in the [verify](examples/verify.rs) example (note `par_bridge()` call).
+When the task to be performed is computational costly, like verifying spending conditions, it is 
+suggested to parallelize the execution like it's done with rayon (or similar) in the 
+[verify](https://github.com/RCasatta/blocks_iterator/blob/master/examples/verify.rs) example 
+(note `par_bridge()` call).
 
 ### Through Pipes
 
 Other than inside Rust programs, ordered blocks with previous outputs could be iterated using Unix pipes.
 
-```
+```sh
 $ cargo build --release 
 $ cargo build --release --examples
 $ ./target/release/blocks_iterator --blocks-dir /Volumes/Transcend/bitcoin-testnet/testnet3/blocks --network testnet --max-reorg 40 | ./target/release/examples/most_output_pipe | ./target/release/examples/heaviest_pipe >/dev/null
@@ -59,7 +65,7 @@ RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --open
 
 Run examples with:
 
-```
+```sh
 cargo run --release --example verify
 ```
 
