@@ -1,7 +1,7 @@
 #![allow(non_snake_case)]
 
 use bitcoin::consensus::{deserialize, encode, Decodable};
-use bitcoin::EcdsaSighashType;
+use bitcoin::sighash::EcdsaSighashType;
 use blocks_iterator::{Config, PeriodCounter};
 use env_logger::Env;
 use log::info;

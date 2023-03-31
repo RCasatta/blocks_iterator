@@ -1,6 +1,6 @@
 use crate::utxo::UtxoStore;
 use crate::{BlockExtra, Periodic};
-use bitcoin::{OutPoint, Script, TxOut};
+use bitcoin::{OutPoint, ScriptBuf, TxOut};
 use log::{debug, info, trace};
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
@@ -70,7 +70,7 @@ impl Fee {
                                 block_extra.outpoint_values.insert(
                                     OutPoint::default(),
                                     TxOut {
-                                        script_pubkey: Script::new(),
+                                        script_pubkey: ScriptBuf::new(),
                                         value: coin_base_output_value,
                                     },
                                 );

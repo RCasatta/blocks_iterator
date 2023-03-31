@@ -1,6 +1,7 @@
 use crate::bitcoin::{BlockHash, Network};
 use crate::{FsBlock, Periodic};
 use bitcoin::hashes::Hash;
+use bitcoin::network::Magic;
 use bitcoin_slices::number::{U32, U8};
 use bitcoin_slices::{bsl, Parse};
 use log::info;
@@ -129,9 +130,10 @@ impl ReadDetect {
     }
 }
 
-pub fn detect(buffer: &[u8], magic: u32) -> Result<Vec<DetectedBlock>, bitcoin_slices::Error> {
+pub fn detect(buffer: &[u8], magic: Magic) -> Result<Vec<DetectedBlock>, bitcoin_slices::Error> {
     let mut pointer = 0usize;
     let mut rolling = RollingU32::default();
+    let magic_u32 = u32::from_le_bytes(magic.to_bytes());
 
     // Instead of sending DetecetdBlock on the channel directly, we quickly insert in the vector
     // allowing to read ahead exactly one file (reading no block ahead cause non-parallelizing
@@ -142,7 +144,7 @@ pub fn detect(buffer: &[u8], magic: u32) -> Result<Vec<DetectedBlock>, bitcoin_s
         pointer += 1;
         current = byte.remaining();
         rolling.push(byte.parsed().into());
-        if magic != rolling.as_u32() {
+        if magic_u32 != rolling.as_u32() {
             continue;
         }
 
@@ -217,6 +219,9 @@ mod test {
             rolling.as_u32(),
             u32::from_be_bytes([0x07, 0x09, 0x11, 0x0B])
         );
-        assert_eq!(rolling.as_u32(), bitcoin::Network::Testnet.magic())
+        assert_eq!(
+            rolling.as_u32(),
+            u32::from_le_bytes(bitcoin::Network::Testnet.magic().to_bytes())
+        )
     }
 }

@@ -171,12 +171,14 @@ impl Decodable for BlockExtra {
 #[cfg(test)]
 pub mod test {
     use crate::bitcoin::consensus::serialize;
-    use crate::bitcoin::{Block, BlockHeader, OutPoint, TxOut};
+    use crate::bitcoin::{Block, OutPoint, TxOut};
     use crate::BlockExtra;
+    use bitcoin::block::{Header, Version};
     use bitcoin::consensus::deserialize;
     use bitcoin::consensus::encode::serialize_hex;
+    use bitcoin::hash_types::TxMerkleNode;
     use bitcoin::hashes::Hash;
-    use bitcoin::{BlockHash, TxMerkleNode};
+    use bitcoin::{BlockHash, CompactTarget};
     use std::collections::HashMap;
 
     #[test]
@@ -191,12 +193,12 @@ pub mod test {
         BlockExtra {
             version: 0,
             block: Block {
-                header: BlockHeader {
-                    version: 0,
+                header: Header {
+                    version: Version::from_consensus(0),
                     prev_blockhash: BlockHash::all_zeros(),
                     merkle_root: TxMerkleNode::all_zeros(),
                     time: 0,
-                    bits: 0,
+                    bits: CompactTarget::from_consensus(0),
                     nonce: 0,
                 },
                 txdata: vec![],
