@@ -1,5 +1,6 @@
 use crate::utxo::{self, AnyUtxo};
-use std::path::PathBuf;
+use bitcoin::Network;
+use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
 /// Configuration parameters, most important the bitcoin blocks directory
@@ -54,6 +55,22 @@ pub struct Config {
 }
 
 impl Config {
+    /// Creates a config with `path` and `network` and defaults parameters
+    pub fn new<P: AsRef<Path>>(path: P, network: Network) -> Self {
+        Self {
+            blocks_dir: path.as_ref().to_owned(),
+            network,
+            skip_prevout: false,
+            max_reorg: 6,
+            channels_size: 0,
+            #[cfg(feature = "db")]
+            utxo_db: None,
+            utxo_redb: None,
+            start_at_height: 0,
+            stop_at_height: None,
+        }
+    }
+
     #[cfg(not(feature = "db"))]
     pub(crate) fn utxo_manager(&self) -> AnyUtxo {
         match &self.utxo_redb {
