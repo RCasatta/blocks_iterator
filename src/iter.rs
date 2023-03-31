@@ -51,7 +51,7 @@ pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
 )]
 /// `par_iter` is used when the task to be performed on the blockchain is more costly
 /// than iterating the blocks. For example verifying the spending conditions in the blockchain.
-/// like [`crate::iter`] accepts configuration parameters via the [`Config`] struct.
+/// like [`crate::iter()`] accepts configuration parameters via the [`Config`] struct.
 /// A `PREPROC` closure has to be provided, this process a single block and produce a Vec of
 /// user defined struct `DATA`.
 /// A `TASK` closure accepts the `DATA` struct and a shared `STATE` and it is executed in a

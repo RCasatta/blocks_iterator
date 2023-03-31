@@ -47,6 +47,14 @@ Running (`cargo run --release -- --network X --blocks-dir Y >/dev/null`) on thre
 | Testnet | false             |           40  | 1 run     |  247MB | 16m:12s |
 | Testnet | false             |           40  | 2 run     |  221MB |  8m:32s |
 
+## Doc
+
+To build docs:
+
+```sh
+RUSTDOCFLAGS="--cfg docsrs" cargo +nightly doc --all-features --open
+```
+
 ## Examples
 
 Run examples with:
