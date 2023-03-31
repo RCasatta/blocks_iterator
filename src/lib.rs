@@ -7,7 +7,6 @@
 #![deny(unused_mut)]
 #![deny(dead_code)]
 #![deny(unused_imports)]
-#![deny(missing_docs)]
 #![deny(unused_must_use)]
 #![cfg_attr(all(test, feature = "unstable"), feature(test))]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
@@ -18,7 +17,7 @@ use bitcoin::BlockHash;
 use log::{info, Level};
 use std::fs::File;
 
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{sync_channel, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -30,6 +29,7 @@ pub use period::{PeriodCounter, Periodic};
 mod block_extra;
 mod bsl;
 mod config;
+mod error;
 mod iter;
 mod period;
 mod pipe;
@@ -45,6 +45,7 @@ pub use structopt;
 
 pub use block_extra::BlockExtra;
 pub use config::Config;
+pub use error::Error;
 pub use iter::iter;
 pub use pipe::PipeIterator;
 
@@ -102,7 +103,7 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
             config.network,
             config.max_reorg,
             config.stop_at_height,
-            early_stop,
+            early_stop.clone(),
             receive_block_fs,
             send_ordered_blocks,
         );
@@ -124,12 +125,21 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
         );
 
         if !config.skip_prevout {
-            let _fee = stages::Fee::new(
-                config.start_at_height,
-                receive_blocks_with_txids,
-                channel,
-                config.utxo_manager(),
-            );
+            match config.utxo_manager() {
+                Ok(utxo_manager) => {
+                    let _fee = stages::Fee::new(
+                        config.start_at_height,
+                        receive_blocks_with_txids,
+                        channel,
+                        utxo_manager,
+                    );
+                }
+                Err(e) => {
+                    log::error!("{e}");
+                    early_stop.store(true, Ordering::Relaxed);
+                    channel.send(None).unwrap();
+                }
+            }
         }
 
         info!("Total time elapsed: {}s", now.elapsed().as_secs());

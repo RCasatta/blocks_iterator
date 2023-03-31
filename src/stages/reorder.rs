@@ -193,7 +193,9 @@ impl Reorder {
                     busy_time / 1_000_000_000,
                     last_height
                 );
-                sender.send(None).expect("reorder cannot send none");
+                if !early_stop.load(Ordering::Relaxed) {
+                    sender.send(None).expect("reorder cannot send none");
+                }
             })),
         }
     }
