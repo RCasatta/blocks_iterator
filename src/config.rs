@@ -40,7 +40,7 @@ pub struct Config {
     ///
     /// Note with feature db you also have the options to use rocksdb, which is faster during creation of the utxo set
     /// but slower to compile.
-    #[structopt(short, long)]
+    #[structopt(long)]
     pub utxo_redb: Option<PathBuf>,
 
     /// Start the blocks iteration at the specified height, note blocks*.dat file are read and
