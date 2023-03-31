@@ -128,6 +128,7 @@ mod inner_test {
             utxo_db: None,
             start_at_height: 0,
             stop_at_height: None,
+            utxo_redb: None,
         }
     }
 

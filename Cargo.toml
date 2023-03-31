@@ -17,7 +17,7 @@ log = "0.4.11"
 glob = "0.3.0"
 fxhash = "0.2.1"
 env_logger = "0.9"
-bitcoin_slices = { version="0.4", features = ["sha2"] }
+bitcoin_slices = { version="0.4", features = ["sha2", "redb", "bitcoin"] }
 
 rand = { version = "0.8.4", optional = true }
 rocksdb = { version = "0.18.0", optional = true, default-features = false }
@@ -42,7 +42,6 @@ unstable = ["sha2", "blake3"]
 
 [[bin]]
 name = "blocks_iterator"
-required-features = ["db"]
 
 [[example]]
 name = "with_pipe"

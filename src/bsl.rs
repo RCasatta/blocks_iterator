@@ -1,3 +1,4 @@
+use bitcoin_slices::bsl::parse_len;
 use bitcoin_slices::{bsl, Parse, ParseResult};
 use bitcoin_slices::{number::U32, number::U8, read_slice, SResult, Visit, Visitor};
 
@@ -25,11 +26,11 @@ impl<'a> Visit<'a> for BlockExtra<'a> {
         let block_size = U32::parse(block_hash.remaining())?;
         consumed += 32;
 
-        let next_len = bsl::Len::parse(block_size.remaining())?;
+        let next_len = parse_len(block_size.remaining())?;
         consumed += next_len.consumed();
 
-        let mut current = next_len.remaining();
-        for _ in 0..next_len.parsed().n() {
+        let mut current = &block_size.remaining()[next_len.consumed()..];
+        for _ in 0..next_len.n() {
             let block_hash = read_slice(current, 32)?;
             current = block_hash.remaining();
             consumed += 32;

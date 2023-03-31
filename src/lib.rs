@@ -87,10 +87,18 @@ pub struct Config {
     pub channels_size: u8,
 
     #[cfg(feature = "db")]
-    /// Specify a directory where a database will be created to store the Utxo (when `--skip-prevout` is not used)
+    /// Specify a **directory** where a rocks database will be created to store the Utxo (when `--skip-prevout` is not used)
     /// Reduce the memory requirements but it's slower and use disk space
     #[structopt(short, long)]
     pub utxo_db: Option<PathBuf>,
+
+    /// Specify a **file** where a redb database will be created to store the Utxo (when `--skip-prevout` is not used)
+    /// Reduce the memory requirements but it's slower and use disk space.
+    ///
+    /// Note with feature db you also have the options to use rocksdb, which is faster during creation of the utxo set
+    /// but slower to compile.
+    #[structopt(short, long)]
+    pub utxo_redb: Option<PathBuf>,
 
     /// Start the blocks iteration at the specified height, note blocks*.dat file are read and
     /// analyzed anyway to follow the blockchain starting at the genesis and populate utxos,
@@ -106,13 +114,18 @@ pub struct Config {
 impl Config {
     #[cfg(not(feature = "db"))]
     fn utxo_manager(&self) -> AnyUtxo {
-        AnyUtxo::Mem(utxo::MemUtxo::new(self.network))
+        match &self.utxo_redb {
+            Some(path) => AnyUtxo::Redb(utxo::RedbUtxo::new(path).unwrap()),
+            None => AnyUtxo::Mem(utxo::MemUtxo::new(self.network)),
+        }
     }
     #[cfg(feature = "db")]
     fn utxo_manager(&self) -> AnyUtxo {
-        match &self.utxo_db {
-            Some(path) => AnyUtxo::Db(utxo::DbUtxo::new(path).unwrap()), //TODO unwrap
-            None => AnyUtxo::Mem(utxo::MemUtxo::new(self.network)),
+        match (&self.utxo_db, &self.utxo_redb) {
+            (Some(_), Some(_)) => panic!("utxo_db and utxo_redb cannot be specified together"),
+            (Some(path), None) => AnyUtxo::Db(utxo::DbUtxo::new(path).unwrap()), //TODO unwrap
+            (None, Some(path)) => AnyUtxo::Redb(utxo::RedbUtxo::new(path).unwrap()), //TODO unwra
+            (None, None) => AnyUtxo::Mem(utxo::MemUtxo::new(self.network)),
         }
     }
 }
@@ -218,7 +231,7 @@ mod inner_test {
     use crate::{iterate, Config};
     use std::sync::mpsc::sync_channel;
 
-    fn test_conf() -> Config {
+    pub fn test_conf() -> Config {
         Config {
             blocks_dir: "blocks".into(),
             network: Network::Testnet,
@@ -229,6 +242,7 @@ mod inner_test {
             utxo_db: None,
             start_at_height: 0,
             stop_at_height: None,
+            utxo_redb: None,
         }
     }
 

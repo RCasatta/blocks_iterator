@@ -13,6 +13,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     info!("start");
 
     let config = Config::from_args();
+
     let blocks_iter = blocks_iterator::iter(config);
     let mut buffer = [0u8; MAX_VEC_SIZE];
     for block_extra in blocks_iter {
