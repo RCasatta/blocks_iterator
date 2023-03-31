@@ -16,9 +16,20 @@ scripts in the blockchain.
 
 ### In rust programs
 
-Used as a library blocks could be iterated via the [`iter()`] method like done in 
-[outputs_versions](https://github.com/RCasatta/blocks_iterator/blob/master/examples/outputs_versions.rs) 
-example.
+Used as a library blocks could be iterated via the [`iter()`] method like:
+
+```rust
+// "blocks" dir contains first 400 testnet blocks
+let conf = blocks_iterator::Config::new("blocks", bitcoin::Network::Testnet);
+let mut total_fee = 0u64;
+for b in blocks_iterator::iter(conf) {
+  total_fee += b.fee().expect("fee available cause we are keeping prevouts");
+}
+
+// Only a bunch of tx with fee exists on testnet with height < 400
+// in blocks: 385, 387, 389, 390, 392, 394
+assert_eq!(total_fee, 450_000u64);
+```
 
 When the task to be performed is computational costly, like verifying spending conditions, it is 
 suggested to parallelize the execution like it's done with rayon (or similar) in the 
@@ -32,15 +43,20 @@ Other than inside Rust programs, ordered blocks with previous outputs could be i
 ```sh
 $ cargo build --release 
 $ cargo build --release --examples
-$ ./target/release/blocks_iterator --blocks-dir /Volumes/Transcend/bitcoin-testnet/testnet3/blocks --network testnet --max-reorg 40 | ./target/release/examples/most_output_pipe | ./target/release/examples/heaviest_pipe >/dev/null
+$ ./target/release/blocks_iterator --blocks-dir ~/.bitcoin/testnet3/blocks --network testnet --max-reorg 40 --stop-at-height 200000 | ./target/release/examples/with_pipe
 ...
-[2021-10-21T10:10:24Z INFO  most_output_pipe] most_output tx is d28305817238ee92e5d9ac0d81c3bf5ecf7399528e6d87226d726e4070c7e665 with #outputs: 30001
-[2021-10-21T10:10:24Z INFO  heaviest_pipe] heaviest tx is 73e64e38faea386c88a578fd1919bcdba3d0b3af7b6302bf6ee1b423dc4e4333 with weight: 3999608
+[2023-03-31T15:01:23Z INFO  with_pipe] Max number of txs: 6287 block: 0000000000bc915505318327aa0f18568ce024702a024d7c4a3ecfe80a893d6c
+[2023-03-31T15:01:23Z INFO  with_pipe] total missing reward: 50065529986 in 100 blocks
+[2023-03-31T15:01:23Z INFO  with_pipe] most_output tx is 640e22b5ddee1f6d2d701e37877027221ba5b36027634a2e3c3ee1569b4aa179 with #outputs: 10001
 ```
+
+If you have more consumer process you can concatenate pipes by passing stdout to `PipeIterator::new` or using `tee` utility to split the stdout of blocks_iterator. The latter is better because it doesn't require re-serialization of the data.
 
 ## Memory requirements and performance
 
-Running (`cargo run --release -- --network X --blocks-dir Y >/dev/null`) on threadripper 1950X, Testnet @ 2130k, Mainnet @ 705k. Spinning disk. Take following benchmarks with a grain of salt since they refer to older versions.
+Running (`cargo run --release -- --network X --blocks-dir Y >/dev/null`) on threadripper 1950X, 
+Testnet @ 2130k, Mainnet @ 705k. Spinning disk. Take following benchmarks with a grain of salt 
+since they refer to older versions.
 
 | Network | `--skip--prevout` | `--max-reorg` | `utxo-db` | Memory | Time    |
 |---------|-------------------|---------------|----------:|-------:|--------:|
