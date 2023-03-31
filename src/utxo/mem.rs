@@ -2,7 +2,7 @@ use crate::bitcoin::{Network, Transaction, Txid};
 use crate::utxo::{Hash64, UtxoStore};
 use crate::BlockExtra;
 use bitcoin::hashes::Hash;
-use bitcoin::{OutPoint, PubkeyHash, Script, ScriptHash, TxOut, WPubkeyHash};
+use bitcoin::{OutPoint, PubkeyHash, ScriptBuf, ScriptHash, TxOut, WPubkeyHash};
 use fxhash::FxHashMap;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hasher};
@@ -89,7 +89,7 @@ enum StackScript {
     P2Pkh(PubkeyHash),
     P2Sh(ScriptHash),
     P2V0Wpkh(WPubkeyHash),
-    Other(Script),
+    Other(ScriptBuf),
 }
 
 impl StackScript {
@@ -101,27 +101,27 @@ impl StackScript {
     }
 }
 
-impl From<&Script> for StackScript {
-    fn from(script: &Script) -> Self {
+impl From<&ScriptBuf> for StackScript {
+    fn from(script: &ScriptBuf) -> Self {
         if script.is_p2pkh() {
-            StackScript::P2Pkh(PubkeyHash::from_slice(&script[3..23]).unwrap())
+            StackScript::P2Pkh(PubkeyHash::from_slice(&script.as_bytes()[3..23]).unwrap())
         } else if script.is_p2sh() {
-            StackScript::P2Sh(ScriptHash::from_slice(&script[2..22]).unwrap())
+            StackScript::P2Sh(ScriptHash::from_slice(&script.as_bytes()[2..22]).unwrap())
         } else if script.is_v0_p2wpkh() {
-            StackScript::P2V0Wpkh(WPubkeyHash::from_slice(&script[2..22]).unwrap())
+            StackScript::P2V0Wpkh(WPubkeyHash::from_slice(&script.as_bytes()[2..22]).unwrap())
         } else {
             StackScript::Other(script.clone())
         }
     }
 }
 
-impl From<StackScript> for Script {
+impl From<StackScript> for ScriptBuf {
     fn from(stack_script: StackScript) -> Self {
         match stack_script {
             StackScript::Other(script) => script,
-            StackScript::P2Pkh(h) => Script::new_p2pkh(&h),
-            StackScript::P2Sh(h) => Script::new_p2sh(&h),
-            StackScript::P2V0Wpkh(h) => Script::new_v0_p2wpkh(&h),
+            StackScript::P2Pkh(h) => ScriptBuf::new_p2pkh(&h),
+            StackScript::P2Sh(h) => ScriptBuf::new_p2sh(&h),
+            StackScript::P2V0Wpkh(h) => ScriptBuf::new_v0_p2wpkh(&h),
         }
     }
 }
@@ -168,6 +168,7 @@ impl TruncMap {
             Network::Testnet => 28_038_982, // @2097712 load:93.2%
             Network::Signet => 1 >> 20,
             Network::Regtest => 1 >> 10,
+            _ => panic!("unrecognized network"),
         };
 
         TruncMap {
@@ -212,35 +213,35 @@ mod test {
     use crate::utxo::mem::StackScript;
     use crate::FsBlock;
     use bitcoin::hashes::Hash;
-    use bitcoin::{PubkeyHash, PublicKey, Script, ScriptHash, WPubkeyHash, WScriptHash};
+    use bitcoin::{PubkeyHash, PublicKey, ScriptBuf, ScriptHash, WPubkeyHash, WScriptHash};
 
     #[test]
     fn test_size() {
-        assert_eq!(std::mem::size_of::<StackScript>(), 24);
+        assert_eq!(std::mem::size_of::<StackScript>(), 32);
         assert_eq!(std::mem::size_of::<PublicKey>(), 65);
         assert_eq!(std::mem::size_of::<PubkeyHash>(), 20);
         assert_eq!(std::mem::size_of::<ScriptHash>(), 20);
         assert_eq!(std::mem::size_of::<WPubkeyHash>(), 20);
         assert_eq!(std::mem::size_of::<WScriptHash>(), 32);
         assert_eq!(std::mem::size_of::<Box<[u8]>>(), 16);
-        assert_eq!(std::mem::size_of::<(StackScript, u64)>(), 32);
+        assert_eq!(std::mem::size_of::<(StackScript, u64)>(), 40);
         assert_eq!(std::mem::size_of::<FsBlock>(), 112);
     }
 
     #[test]
     fn test_script_stack() {
         let hash = PubkeyHash::from_slice(&[9u8; 20]).unwrap();
-        let script = Script::new_p2pkh(&hash);
+        let script = ScriptBuf::new_p2pkh(&hash);
         let stack_script: StackScript = (&script).into();
         assert_eq!(stack_script, StackScript::P2Pkh(hash));
 
         let hash = ScriptHash::from_slice(&[8u8; 20]).unwrap();
-        let script = Script::new_p2sh(&hash);
+        let script = ScriptBuf::new_p2sh(&hash);
         let stack_script: StackScript = (&script).into();
         assert_eq!(stack_script, StackScript::P2Sh(hash));
 
         let hash = WPubkeyHash::from_slice(&[7u8; 20]).unwrap();
-        let script = Script::new_v0_p2wpkh(&hash);
+        let script = ScriptBuf::new_v0_p2wpkh(&hash);
         let stack_script: StackScript = (&script).into();
         assert_eq!(stack_script, StackScript::P2V0Wpkh(hash));
     }

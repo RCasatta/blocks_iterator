@@ -1,3 +1,4 @@
+use bitcoin::Weight;
 use bitcoin::{hashes::Hash, BlockHash, Txid};
 use blocks_iterator::PipeIterator;
 use env_logger::Env;
@@ -15,7 +16,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut block_most_tx: (BlockHash, usize) = (BlockHash::all_zeros(), 0);
     let mut most_output: (Txid, usize) = (Txid::all_zeros(), 0);
-    let mut heaviest: (Txid, usize) = (Txid::all_zeros(), 0);
+    let mut heaviest: (Txid, Weight) = (Txid::all_zeros(), Weight::ZERO);
 
     for block_extra in iter {
         let txs_fee = block_extra.fee().expect("launch without `--skip-prevout`");
