@@ -1,5 +1,5 @@
 use bitcoin::consensus::{deserialize, serialize};
-use bitcoin::{Amount, Script, Transaction};
+use bitcoin::{Amount, ScriptBuf, Transaction};
 use bitcoinconsensus::height_to_flags;
 use blocks_iterator::{BlockExtra, Config};
 use env_logger::Env;
@@ -11,7 +11,7 @@ use structopt::StructOpt;
 
 #[derive(Debug)]
 struct VerifyData {
-    script_pubkey: Script,
+    script_pubkey: ScriptBuf,
     index: usize,
     amount: Amount,
     spending: Arc<Vec<u8>>,
