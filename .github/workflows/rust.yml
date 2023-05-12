@@ -1,44 +1,36 @@
 name: blocks-iterator
 
-on: [pull_request]
+on:
+  push:
+    branches:
+      - master
+  pull_request: {}
 
 jobs:
 
   cosmetics:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: stable
-          override: true
-          profile: minimal
           components: rustfmt, clippy
-      - name: fmt
-        run: cargo fmt -- --check
-      - name: clippy
-        run: cargo clippy --no-default-features -- -D warnings
+      - run: cargo fmt -- --check
+      - run: cargo clippy --no-default-features -- -D warnings
 
   test:
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
       matrix:
-        rust: [stable, nightly, 1.66.0]
+        toolchain: [stable, nightly, 1.66.0]
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: Swatinem/rust-cache@v1.2.0
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@master
         with:
-          key: ${{ matrix.rust }}
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ matrix.rust }}
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --verbose --no-default-features
+          toolchain: ${{ matrix.toolchain }}
+      - run: cargo test --no-default-features
       - run: cargo +nightly bench --features unstable --no-default-features
         if: ${{ matrix.rust == 'nightly' }}
 
@@ -47,40 +39,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [ "verify --features consensus", "signatures_in_witness", "outputs_versions"]
+        example: ["verify --features consensus", "signatures_in_witness", "outputs_versions"]
     steps:
-      - uses: actions/checkout@v2
-      - uses: Swatinem/rust-cache@v1.2.0
-        with:
-          key: ${{ matrix.example }}
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        env:
-          RUST_LOG: "debug"
-        with:
-          command: run
-          args: --no-default-features --example ${{ matrix.example }} -- --blocks-dir blocks --network testnet
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo run --no-default-features --example ${{ matrix.example }} -- --blocks-dir blocks --network testnet
 
   pipe-example:
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
-      - uses: Swatinem/rust-cache@v1.2.0
-        with:
-          key: ${{ matrix.example }}
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --no-default-features
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --no-default-features --examples
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --no-default-features
+      - run: cargo build --release --no-default-features --examples
       - run: ./target/release/blocks_iterator --blocks-dir blocks --network testnet --max-reorg 40 | ./target/release/examples/with_pipe
