@@ -9,6 +9,7 @@ documentation = "https://docs.rs/blocks_iterator/"
 keywords = ["bitcoin", "blocks", "iterate"]
 readme = "README.md"
 license = "MIT"
+categories = ["cryptography::cryptocurrencies", "command-line-utilities", "parsing"]
 
 [dependencies]
 bitcoin =  { version = "0.30", features = ["serde"] }
