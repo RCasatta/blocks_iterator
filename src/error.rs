@@ -1,5 +1,6 @@
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[cfg(feature = "redb")]
     #[error(transparent)]
     Redb(#[from] bitcoin_slices::redb::Error),
 

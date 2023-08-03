@@ -1,5 +1,3 @@
-use crate::utxo::{self, AnyUtxo};
-use crate::Error;
 use bitcoin::Network;
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
@@ -36,6 +34,7 @@ pub struct Config {
     #[structopt(short, long)]
     pub utxo_db: Option<PathBuf>,
 
+    #[cfg(feature = "redb")]
     /// Specify a **file** where a redb database will be created to store the Utxo (when `--skip-prevout` is not used)
     /// Reduce the memory requirements but it's slower and use disk space.
     ///
@@ -66,23 +65,40 @@ impl Config {
             channels_size: 0,
             #[cfg(feature = "db")]
             utxo_db: None,
+            #[cfg(feature = "redb")]
             utxo_redb: None,
             start_at_height: 0,
             stop_at_height: None,
         }
     }
 
-    #[cfg(not(feature = "db"))]
-    pub(crate) fn utxo_manager(&self) -> Result<AnyUtxo, Error> {
+    #[cfg(all(not(feature = "db"), not(feature = "redb")))]
+    pub(crate) fn utxo_manager(&self) -> Result<crate::utxo::AnyUtxo, crate::Error> {
+        use crate::utxo::{self, AnyUtxo};
+        Ok(AnyUtxo::Mem(utxo::MemUtxo::new(self.network)))
+    }
+
+    #[cfg(all(not(feature = "db"), feature = "redb"))]
+    pub(crate) fn utxo_manager(&self) -> Result<crate::utxo::AnyUtxo, crate::Error> {
+        use crate::utxo::{self, AnyUtxo};
         Ok(match &self.utxo_redb {
             Some(path) => AnyUtxo::Redb(utxo::RedbUtxo::new(path)?),
             None => AnyUtxo::Mem(utxo::MemUtxo::new(self.network)),
         })
     }
-    #[cfg(feature = "db")]
-    pub(crate) fn utxo_manager(&self) -> Result<AnyUtxo, Error> {
+    #[cfg(all(feature = "db", not(feature = "redb")))]
+    pub(crate) fn utxo_manager(&self) -> Result<crate::utxo::AnyUtxo, crate::Error> {
+        use crate::utxo::{self, AnyUtxo};
+        Ok(match &self.utxo_db {
+            Some(path) => AnyUtxo::Db(utxo::DbUtxo::new(path)?),
+            None => AnyUtxo::Mem(utxo::MemUtxo::new(self.network)),
+        })
+    }
+    #[cfg(all(feature = "db", feature = "redb"))]
+    pub(crate) fn utxo_manager(&self) -> Result<crate::utxo::AnyUtxo, crate::Error> {
+        use crate::utxo::{self, AnyUtxo};
         Ok(match (&self.utxo_db, &self.utxo_redb) {
-            (Some(_), Some(_)) => return Err(Error::OneDb),
+            (Some(_), Some(_)) => return Err(crate::Error::OneDb),
             (Some(path), None) => AnyUtxo::Db(utxo::DbUtxo::new(path)?),
             (None, Some(path)) => AnyUtxo::Redb(utxo::RedbUtxo::new(path)?),
             (None, None) => AnyUtxo::Mem(utxo::MemUtxo::new(self.network)),

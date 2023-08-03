@@ -5,9 +5,12 @@ mod mem;
 #[cfg(feature = "db")]
 mod db;
 
+#[cfg(feature = "redb")]
 mod redb;
 
 pub use mem::MemUtxo;
+
+#[cfg(feature = "redb")]
 pub use redb::RedbUtxo;
 
 use bitcoin::OutPoint;
@@ -33,6 +36,7 @@ pub enum AnyUtxo {
     #[cfg(feature = "db")]
     Db(db::DbUtxo),
     Mem(MemUtxo),
+    #[cfg(feature = "redb")]
     Redb(redb::RedbUtxo),
 }
 
@@ -42,6 +46,7 @@ impl UtxoStore for AnyUtxo {
             #[cfg(feature = "db")]
             AnyUtxo::Db(db) => db.add_outputs_get_inputs(block_extra, height),
             AnyUtxo::Mem(mem) => mem.add_outputs_get_inputs(block_extra, height),
+            #[cfg(feature = "redb")]
             AnyUtxo::Redb(db) => db.add_outputs_get_inputs(block_extra, height),
         }
     }
@@ -51,6 +56,7 @@ impl UtxoStore for AnyUtxo {
             #[cfg(feature = "db")]
             AnyUtxo::Db(db) => db.stat(),
             AnyUtxo::Mem(mem) => mem.stat(),
+            #[cfg(feature = "redb")]
             AnyUtxo::Redb(db) => db.stat(),
         }
     }

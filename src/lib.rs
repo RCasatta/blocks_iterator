@@ -8,7 +8,6 @@
 #![deny(dead_code)]
 #![deny(unused_imports)]
 #![deny(unused_must_use)]
-#![cfg_attr(all(test, feature = "unstable"), feature(test))]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #[cfg(all(test, feature = "unstable"))]
 extern crate test;
@@ -254,7 +253,7 @@ mod bench {
             engine.input(&outpoint.vout.to_ne_bytes()[..]);
             let hash = sha256::Hash::from_engine(engine);
             let mut result = [0u8; 12];
-            result.copy_from_slice(&hash.into_inner()[..12]);
+            result.copy_from_slice(&hash.as_byte_array()[..12]);
             black_box(result);
         });
     }
@@ -271,7 +270,7 @@ mod bench {
             engine.input(&outpoint.vout.to_ne_bytes()[..]);
             let hash = sha256::Hash::from_engine(engine);
             let mut result = [0u8; 12];
-            result.copy_from_slice(&hash.into_inner()[..12]);
+            result.copy_from_slice(&hash.as_byte_array()[..12]);
             black_box(result);
         });
     }
@@ -284,7 +283,7 @@ mod bench {
         b.iter(|| {
             let mut hasher = Sha256::new();
             hasher.update(&salt);
-            hasher.update(&outpoint.txid.as_ref());
+            hasher.update(&outpoint.txid.as_byte_array());
             hasher.update(&outpoint.vout.to_ne_bytes()[..]);
             let hash = hasher.finalize();
             let mut result = [0u8; 12];

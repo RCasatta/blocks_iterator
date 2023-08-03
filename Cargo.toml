@@ -9,16 +9,20 @@ documentation = "https://docs.rs/blocks_iterator/"
 keywords = ["bitcoin", "blocks", "iterate"]
 readme = "README.md"
 license = "MIT"
-categories = ["cryptography::cryptocurrencies", "command-line-utilities", "encoding"]
+categories = [
+    "cryptography::cryptocurrencies",
+    "command-line-utilities",
+    "encoding",
+]
 
 [dependencies]
-bitcoin =  { version = "0.30", features = ["serde"] }
+bitcoin = { version = "0.30", features = ["serde"] }
 structopt = "0.3.21"
 log = "0.4.11"
 glob = "0.3.0"
 fxhash = "0.2.1"
 env_logger = "0.10"
-bitcoin_slices = { version="0.5", features = ["sha2", "redb", "bitcoin"] }
+bitcoin_slices = { version = "0.6.2", features = ["sha2", "bitcoin"] }
 
 rand = { version = "0.8.4", optional = true }
 rocksdb = { version = "0.18.0", optional = true, default-features = false }
@@ -39,6 +43,7 @@ tempfile = "3.2.0"
 [features]
 default = []
 db = ["rocksdb", "rand"]
+redb = ["bitcoin_slices/redb"]
 consensus = ["bitcoinconsensus", "bitcoin/bitcoinconsensus"]
 unstable = ["sha2", "blake3"]
 
