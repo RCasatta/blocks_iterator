@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        toolchain: [stable, nightly, 1.60.0, 1.66.0]
+        toolchain: [stable, nightly, 1.60.0, 1.67.0]
 
     steps:
       - uses: actions/checkout@v3
@@ -36,8 +36,8 @@ jobs:
         if: ${{ matrix.toolchain == '1.60.0' }}
       - run: cargo test --no-default-features
       - run: cargo test --features db,redb,consensus
-        if: ${{ matrix.toolchain == 'stable' || matrix.toolchain == '1.66.0'  }}
-      - run: cargo +nightly bench --features unstable --no-default-features
+        if: ${{ matrix.toolchain == 'stable' || matrix.toolchain == '1.67.0'  }}
+      - run: cd benches && cargo +nightly bench
         if: ${{ matrix.toolchain == 'nightly' }}
 
   examples:
