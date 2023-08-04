@@ -16,23 +16,29 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: cargo fmt -- --check
-      - run: cargo clippy --no-default-features -- -D warnings
+      - run: cargo clippy -- -D warnings
 
   test:
     runs-on: ubuntu-20.04
     strategy:
       fail-fast: false
       matrix:
-        toolchain: [stable, nightly, 1.66.0]
+        toolchain: [stable, nightly, 1.60.0, 1.66.0]
 
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
+      - run: |
+          cargo update -p is-terminal --precise 0.4.7
+          cargo update -p tempfile --precise 3.6.0
+        if: ${{ matrix.toolchain == '1.60.0' }}
       - run: cargo test --no-default-features
+      - run: cargo test --features db,redb,consensus
+        if: ${{ matrix.toolchain == 'stable' || matrix.toolchain == '1.66.0'  }}
       - run: cargo +nightly bench --features unstable --no-default-features
-        if: ${{ matrix.rust == 'nightly' }}
+        if: ${{ matrix.toolchain == 'nightly' }}
 
   examples:
     runs-on: ubuntu-20.04
@@ -43,7 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo run --no-default-features --example ${{ matrix.example }} -- --blocks-dir blocks --network testnet
+      - run: cargo run --example ${{ matrix.example }} -- --blocks-dir blocks --network testnet
 
   pipe-example:
     runs-on: ubuntu-20.04
@@ -51,5 +57,5 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release --no-default-features
-      - run: cargo build --release --no-default-features --examples
+      - run: cargo build --release --examples
       - run: ./target/release/blocks_iterator --blocks-dir blocks --network testnet --max-reorg 40 | ./target/release/examples/with_pipe

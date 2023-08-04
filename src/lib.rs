@@ -8,6 +8,7 @@
 #![deny(dead_code)]
 #![deny(unused_imports)]
 #![deny(unused_must_use)]
+#![cfg_attr(all(test, feature = "unstable"), feature(test))]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #[cfg(all(test, feature = "unstable"))]
 extern crate test;

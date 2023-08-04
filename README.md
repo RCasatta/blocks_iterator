@@ -109,4 +109,7 @@ The `1.0` is not to be intended as *battle-tested production-ready* library, the
 
 ## MSRV 
 
-Check minimum rust version run in CI (as of Mar 2023 is stable `1.66.0`)
+Check minimum rust version run in CI, as of Aug 2023 is:
+
+* `1.60.0` without features (needs some pinning, check CI)
+* `1.66.0` with features.
