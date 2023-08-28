@@ -143,8 +143,12 @@ impl Encodable for BlockExtra {
 
 impl Decodable for BlockExtra {
     fn consensus_decode<D: bitcoin::io::Read + ?Sized>(d: &mut D) -> Result<Self, encode::Error> {
+        let version = Decodable::consensus_decode(d)?;
+        if version != 0 {
+            return Err(encode::Error::ParseFailed("Only version 0 is supported"));
+        }
         Ok(BlockExtra {
-            version: Decodable::consensus_decode(d)?,
+            version,
             block: Decodable::consensus_decode(d)?,
             block_hash: Decodable::consensus_decode(d)?,
             size: Decodable::consensus_decode(d)?,
@@ -181,8 +185,8 @@ pub mod test {
     use crate::bitcoin::{Block, OutPoint, TxOut};
     use crate::BlockExtra;
     use bitcoin::block::{Header, Version};
-    use bitcoin::consensus::deserialize;
     use bitcoin::consensus::encode::serialize_hex;
+    use bitcoin::consensus::{deserialize, Decodable};
     use bitcoin::hash_types::TxMerkleNode;
     use bitcoin::hashes::Hash;
     use bitcoin::{BlockHash, CompactTarget};
@@ -244,5 +248,15 @@ pub mod test {
         let be = block_extra();
         let hex = serialize_hex(&be);
         assert_eq!(hex, "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffff00000000000000000000000000");
+    }
+
+    #[test]
+    fn block_extra_unsupported_version() {
+        assert_eq!(
+            "parse failed: Only version 0 is supported",
+            BlockExtra::consensus_decode(&mut &[1u8][..])
+                .unwrap_err()
+                .to_string()
+        );
     }
 }
