@@ -201,21 +201,23 @@ pub mod test {
     }
 
     pub fn block_extra() -> BlockExtra {
+        let block = Block {
+            header: Header {
+                version: Version::from_consensus(0),
+                prev_blockhash: BlockHash::all_zeros(),
+                merkle_root: TxMerkleNode::all_zeros(),
+                time: 0,
+                bits: CompactTarget::from_consensus(0),
+                nonce: 0,
+            },
+            txdata: vec![],
+        };
+        let size = serialize(&block).len() as u32;
         BlockExtra {
             version: 0,
-            block: Block {
-                header: Header {
-                    version: Version::from_consensus(0),
-                    prev_blockhash: BlockHash::all_zeros(),
-                    merkle_root: TxMerkleNode::all_zeros(),
-                    time: 0,
-                    bits: CompactTarget::from_consensus(0),
-                    nonce: 0,
-                },
-                txdata: vec![],
-            },
+            block,
             block_hash: BlockHash::all_zeros(),
-            size: 0,
+            size,
             next: vec![BlockHash::all_zeros()],
             height: 0,
             outpoint_values: {
@@ -247,7 +249,7 @@ pub mod test {
     fn test_hex() {
         let be = block_extra();
         let hex = serialize_hex(&be);
-        assert_eq!(hex, "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffff00000000000000000000000000");
+        assert_eq!(hex, "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005100000001000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffff00000000000000000000000000");
     }
 
     #[test]
