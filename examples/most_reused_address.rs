@@ -25,5 +25,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
 
+    let mut vec: Vec<_> = m.into_iter().collect();
+    vec.sort_by(|a, b| a.1.cmp(&b.1));
+
+    for a in vec.iter().rev().take(10) {
+        println!("{} {}", a.0, a.1);
+    }
+
+    println!();
+
+    for a in vec.iter().take(10) {
+        println!("{} {}", a.0, a.1);
+    }
+
     Ok(())
 }
