@@ -33,9 +33,16 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut vec: Vec<_> = m.into_iter().collect();
     vec.sort_by(|a, b| a.1.cmp(&b.1));
-    println!("mapping over 1000 len: {}", mapping_over_10000.len());
+    println!("mapping over 10000 len: {}", mapping_over_10000.len());
 
     for a in vec.iter().take(10) {
+        if let Some(script) = mapping_over_10000.get(&a.0) {
+            let address = Address::from_script(script, network)?;
+            println!("{} {}", address, a.1);
+        }
+    }
+
+    for a in vec.iter().rev().take(10) {
         if let Some(script) = mapping_over_10000.get(&a.0) {
             let address = Address::from_script(script, network)?;
             println!("{} {}", address, a.1);
