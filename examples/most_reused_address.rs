@@ -14,16 +14,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut config = Config::from_args();
     config.skip_prevout = true;
-    let mut m: HashMap<u64, u64> = HashMap::new();
-    let mut mapping_over_1000: HashMap<u64, ScriptBuf> = HashMap::new();
+    let mut m: HashMap<u64, u32> = HashMap::new();
+    let mut mapping_over_10000: HashMap<u64, ScriptBuf> = HashMap::new();
     let network = config.network;
 
     for b in blocks_iterator::iter(config) {
         for tx_out in b.iter_tx().into_iter().flat_map(|e| e.1.output.iter()) {
             let h = script_hash(&tx_out.script_pubkey);
             let val = m.entry(h).or_default();
-            if *val > 1000 && !mapping_over_1000.contains_key(val) {
-                mapping_over_1000.insert(h, tx_out.script_pubkey.clone());
+            if *val > 10000 && !mapping_over_10000.contains_key(&h) {
+                info!("{}", tx_out.script_pubkey.to_asm_string());
+                mapping_over_10000.insert(h, tx_out.script_pubkey.clone());
             }
 
             *val += 1;
@@ -32,10 +33,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut vec: Vec<_> = m.into_iter().collect();
     vec.sort_by(|a, b| a.1.cmp(&b.1));
-    println!("mapping over 1000 len: {}", mapping_over_1000.len());
+    println!("mapping over 1000 len: {}", mapping_over_10000.len());
 
     for a in vec.iter().take(10) {
-        if let Some(script) = mapping_over_1000.get(&a.0) {
+        if let Some(script) = mapping_over_10000.get(&a.0) {
             let address = Address::from_script(script, network)?;
             println!("{} {}", address, a.1);
         }
