@@ -97,9 +97,7 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
         let (send_ordered_blocks, receive_ordered_blocks) =
             sync_channel(config.channels_size.into());
         let _reorder = stages::Reorder::new(
-            config.network,
-            config.max_reorg,
-            config.stop_at_height,
+            &config,
             early_stop.clone(),
             receive_block_fs,
             send_ordered_blocks,

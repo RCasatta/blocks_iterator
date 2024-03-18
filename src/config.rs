@@ -1,4 +1,4 @@
-use bitcoin::Network;
+use bitcoin::{BlockHash, Network};
 use std::path::{Path, PathBuf};
 use structopt::StructOpt;
 
@@ -52,6 +52,18 @@ pub struct Config {
     /// Stop the blocks iteration at the specified height
     #[structopt(long)]
     pub stop_at_height: Option<u32>,
+
+    /// Start the search at the given hash for pruned nodes.
+    ///
+    /// Using this option imply there is no utxo calculation.
+    /// When using this option is mandatory to specify the right `start_at_height` for the given block hash. It must be greater than 0.
+    /// When using this option the bitcoin node must be stopped, to avoid pruning initial blocks while running.
+    ///
+    /// Eg.
+    /// call `getblockchaininfo` on your pruned node. Set `start_at_hash`` with x and set `start_at_height` with y
+    ///
+    #[structopt(long)]
+    start_at_hash: Option<BlockHash>,
 }
 
 impl Config {
@@ -69,6 +81,23 @@ impl Config {
             utxo_redb: None,
             start_at_height: 0,
             stop_at_height: None,
+            start_at_hash: None,
+        }
+    }
+
+    // TODO handle error instead of using panic
+    pub fn start_at_hash(&self) -> Option<BlockHash> {
+        match self.start_at_hash {
+            Some(start_at_hash) => {
+                if self.start_at_height == 0 {
+                    panic!("When specifying start_at_hash, start_at_height must be greater than 0 and match the height of the hash")
+                }
+                if self.skip_prevout == false {
+                    panic!("When specifying start_at_hash, we can't compute the utxo, so skip_prevout must be true")
+                }
+                Some(start_at_hash)
+            }
+            None => None,
         }
     }
 
