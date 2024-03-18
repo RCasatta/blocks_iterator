@@ -1,6 +1,6 @@
-use crate::{BlockExtra, FsBlock, PeriodCounter, Periodic};
+use crate::{BlockExtra, Config, FsBlock, PeriodCounter, Periodic};
 use bitcoin::blockdata::constants::genesis_block;
-use bitcoin::{BlockHash, Network};
+use bitcoin::BlockHash;
 use log::{info, warn};
 use std::collections::HashMap;
 use std::convert::TryInto;
@@ -92,14 +92,17 @@ impl OutOfOrderBlocks {
 
 impl Reorder {
     pub fn new(
-        network: Network,
-        max_reorg: u8,
-        stop_at_height: Option<u32>,
+        config: &Config,
         early_stop: Arc<AtomicBool>,
         receiver: Receiver<Option<Vec<FsBlock>>>,
         sender: SyncSender<Option<BlockExtra>>,
     ) -> Self {
-        let mut next = genesis_block(network).block_hash();
+        let network = config.network;
+        let max_reorg = config.max_reorg;
+        let stop_at_height = config.stop_at_height;
+        let start_at_hash = config.start_at_hash();
+
+        let mut next = start_at_hash.unwrap_or_else(|| genesis_block(network).block_hash());
         let mut blocks = OutOfOrderBlocks::new(max_reorg);
         let mut height = 0;
         let mut periodic = Periodic::new(Duration::from_secs(60));
