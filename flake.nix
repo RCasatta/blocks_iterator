@@ -39,20 +39,21 @@
             # link rocksdb dynamically
             ROCKSDB_INCLUDE_DIR = "${pkgs.rocksdb}/include";
             ROCKSDB_LIB_DIR = "${pkgs.rocksdb}/lib";
+            
+            cargoExtraArgs = "--all-features";
           };
           cargoArtifacts = craneLib.buildDepsOnly commonArgs;
           bin = craneLib.buildPackage (commonArgs // {
-            inherit cargoArtifacts ;
+            inherit cargoArtifacts;
           });
         in
         with pkgs;
         {
-          packages =
-            {
-              inherit bin;
-              default = bin;
-              blocks_iterator = bin;
-            };
+          packages = {
+            inherit bin;
+            default = bin;
+            blocks_iterator = bin;
+          };
           devShells.default = mkShell {
             inputsFrom = [ bin ];
 
