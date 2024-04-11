@@ -48,8 +48,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                             txid, i, version, block_extra.height
                         );
                         info!("{}", log_line);
-                        output_file.write(log_line.as_bytes()).unwrap();
-                        output_file.write(b"\n").unwrap();
+                        output_file.write_all(log_line.as_bytes()).unwrap();
+                        output_file.write_all(b"\n").unwrap();
                     }
                 }
             }

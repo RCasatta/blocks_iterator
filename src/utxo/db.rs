@@ -31,7 +31,7 @@ impl DbUtxo {
         let db = DB::open(&options, path)?;
 
         let updated_up_to_height = db
-            .get(&[HEIGHT_PREFIX])?
+            .get([HEIGHT_PREFIX])?
             .map(|e| e.try_into().unwrap())
             .map(i32::from_ne_bytes)
             .unwrap_or(-1);
@@ -99,11 +99,10 @@ impl UtxoStore for DbUtxo {
                         }
                         None => {
                             serialize_outpoint(&input.previous_output, &mut outpoint_buffer);
-                            let tx_out = deserialize(
-                                &self.db.get_pinned(&outpoint_buffer).unwrap().unwrap(),
-                            )
-                            .unwrap();
-                            batch.delete(&outpoint_buffer);
+                            let tx_out =
+                                deserialize(&self.db.get_pinned(outpoint_buffer).unwrap().unwrap())
+                                    .unwrap();
+                            batch.delete(outpoint_buffer);
                             prevouts.push(tx_out);
                         }
                     }
@@ -133,20 +132,18 @@ impl UtxoStore for DbUtxo {
                 // TODO consider compress this value serialized prevouts
                 batch.put(serialize_prevouts_height(height), serialize(&prevouts));
             }
-            batch.put(&[HEIGHT_PREFIX], height.to_ne_bytes());
+            batch.put([HEIGHT_PREFIX], height.to_ne_bytes());
             self.db.write(batch).unwrap(); // TODO unwrap
             prevouts
+        } else if block.txdata.len() == 1 {
+            // avoid hitting disk when we have only the coinbase (no prevouts!)
+            Vec::new()
         } else {
-            if block.txdata.len() == 1 {
-                // avoid hitting disk when we have only the coinbase (no prevouts!)
-                Vec::new()
-            } else {
-                self.db
-                    .get_pinned(serialize_prevouts_height(height))
-                    .unwrap()
-                    .map(|e| deserialize(&e).unwrap())
-                    .unwrap()
-            }
+            self.db
+                .get_pinned(serialize_prevouts_height(height))
+                .unwrap()
+                .map(|e| deserialize(&e).unwrap())
+                .unwrap()
         }
     }
 
@@ -171,8 +168,8 @@ mod test {
         serialize_outpoint(&OutPoint::default(), &mut outpoint_buffer);
         let mut expected = [0u8; 37];
         expected[0] = UTXO_PREFIX;
-        for i in 33..37 {
-            expected[i] = 0xFF_u8;
+        for i in expected.iter_mut().skip(33).take(4) {
+            *i = 0xFF_u8;
         }
         assert_eq!(expected, outpoint_buffer);
     }
