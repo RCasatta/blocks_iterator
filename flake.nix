@@ -39,25 +39,25 @@
             # link rocksdb dynamically
             ROCKSDB_INCLUDE_DIR = "${pkgs.rocksdb}/include";
             ROCKSDB_LIB_DIR = "${pkgs.rocksdb}/lib";
-            
+
             cargoExtraArgs = "--all-features";
           };
 
-	  # Building only dependencies, this will not be rebuilt if local src changes
+          # Building only dependencies, this will not be rebuilt if local src changes
           cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 
-        # Run clippy (and deny all warnings) on the crate source,
-        # reusing the dependency artifacts (e.g. from build scripts or
-        # proc-macros) from above.
-        #
-        # Note that this is done as a separate derivation so it
-        # does not impact building just the crate by itself.
-        clippy = craneLib.cargoClippy (commonArgs // {
-          # Again we apply some extra arguments only to this derivation
-          # and not every where else. In this case we add some clippy flags
-          inherit cargoArtifacts;
-          cargoClippyExtraArgs = "--all-targets -- --deny warnings"; # --all-features already defined from cargoExtraArgs
-        });
+          # Run clippy (and deny all warnings) on the crate source,
+          # reusing the dependency artifacts (e.g. from build scripts or
+          # proc-macros) from above.
+          #
+          # Note that this is done as a separate derivation so it
+          # does not impact building just the crate by itself.
+          clippy = craneLib.cargoClippy (commonArgs // {
+            # Again we apply some extra arguments only to this derivation
+            # and not every where else. In this case we add some clippy flags
+            inherit cargoArtifacts;
+            cargoClippyExtraArgs = "--all-targets -- --deny warnings"; # --all-features already defined from cargoExtraArgs
+          });
 
 
           bin = craneLib.buildPackage (commonArgs // {
