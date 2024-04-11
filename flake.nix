@@ -28,7 +28,7 @@
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
           # src = craneLib.cleanCargoSource ./.; # filter out md files which are used in docs
-          src = nixpkgs.lib.cleanSource ./.;
+          src = nixpkgs.lib.cleanSource (craneLib.path ./.);
 
           nativeBuildInputs = with pkgs; [ rustToolchain clang ];
           buildInputs = with pkgs; [ ];
@@ -42,7 +42,24 @@
             
             cargoExtraArgs = "--all-features";
           };
+
+	  # Building only dependencies, this will not be rebuilt if local src changes
           cargoArtifacts = craneLib.buildDepsOnly commonArgs;
+
+        # Run clippy (and deny all warnings) on the crate source,
+        # reusing the dependency artifacts (e.g. from build scripts or
+        # proc-macros) from above.
+        #
+        # Note that this is done as a separate derivation so it
+        # does not impact building just the crate by itself.
+        clippy = craneLib.cargoClippy (commonArgs // {
+          # Again we apply some extra arguments only to this derivation
+          # and not every where else. In this case we add some clippy flags
+          inherit cargoArtifacts;
+          cargoClippyExtraArgs = "--all-targets -- --deny warnings"; # --all-features already defined from cargoExtraArgs
+        });
+
+
           bin = craneLib.buildPackage (commonArgs // {
             inherit cargoArtifacts;
           });
@@ -53,6 +70,9 @@
             inherit bin;
             default = bin;
             blocks_iterator = bin;
+          };
+          checks = {
+            inherit bin clippy;
           };
           devShells.default = mkShell {
             inputsFrom = [ bin ];
