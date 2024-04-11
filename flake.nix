@@ -60,6 +60,13 @@
           });
 
 
+          # Also run the crate tests under cargo-tarpaulin so that we can keep
+          # track of code coverage
+          tarpaulin = craneLib.cargoTarpaulin (commonArgs // {
+            inherit cargoArtifacts;
+
+          });
+
           bin = craneLib.buildPackage (commonArgs // {
             inherit cargoArtifacts;
           });
@@ -72,7 +79,7 @@
             blocks_iterator = bin;
           };
           checks = {
-            inherit bin clippy;
+            inherit bin clippy tarpaulin;
           };
           devShells.default = mkShell {
             inputsFrom = [ bin ];
