@@ -20,7 +20,10 @@
     flake-utils.lib.eachDefaultSystem
       (system:
         let
-          overlays = [ (import rust-overlay) ];
+          overlays = [
+            (import rust-overlay)
+            (import ./rocksdb-overlay.nix)
+          ];
           pkgs = import nixpkgs {
             inherit system overlays;
           };
