@@ -114,9 +114,14 @@ impl Encodable for BlockExtra {
     fn consensus_encode<W: Write + ?Sized>(&self, writer: &mut W) -> Result<usize, std::io::Error> {
         let mut written = 0;
         written += self.version.consensus_encode(writer)?;
+        if self.version == 1 {
+            written += self.size.consensus_encode(writer)?;
+        }
         written += self.block.consensus_encode(writer)?;
         written += self.block_hash.consensus_encode(writer)?;
-        written += self.size.consensus_encode(writer)?;
+        if self.version == 0 {
+            written += self.size.consensus_encode(writer)?;
+        }
         written += self.next.consensus_encode(writer)?;
         written += self.height.consensus_encode(writer)?;
         written += (self.outpoint_values.len() as u32).consensus_encode(writer)?;
@@ -136,11 +141,31 @@ impl Encodable for BlockExtra {
 
 impl Decodable for BlockExtra {
     fn consensus_decode<D: Read + ?Sized>(d: &mut D) -> Result<Self, encode::Error> {
+        let version = Decodable::consensus_decode(d)?;
+        let (size, block, block_hash) = match version {
+            0 => {
+                let block = Decodable::consensus_decode(d)?;
+                let block_hash = Decodable::consensus_decode(d)?;
+                let size = Decodable::consensus_decode(d)?;
+                (size, block, block_hash)
+            }
+            1 => {
+                let size = Decodable::consensus_decode(d)?;
+                let block = Decodable::consensus_decode(d)?;
+                let block_hash = Decodable::consensus_decode(d)?;
+                (size, block, block_hash)
+            }
+            _ => {
+                return Err(encode::Error::ParseFailed(
+                    "Only version 0 and 1 are supported",
+                ));
+            }
+        };
         Ok(BlockExtra {
-            version: Decodable::consensus_decode(d)?,
-            block: Decodable::consensus_decode(d)?,
-            block_hash: Decodable::consensus_decode(d)?,
-            size: Decodable::consensus_decode(d)?,
+            version,
+            block,
+            block_hash,
+            size,
             next: Decodable::consensus_decode(d)?,
             height: Decodable::consensus_decode(d)?,
             outpoint_values: {
@@ -174,8 +199,8 @@ pub mod test {
     use crate::bitcoin::{Block, OutPoint, TxOut};
     use crate::BlockExtra;
     use bitcoin::block::{Header, Version};
-    use bitcoin::consensus::deserialize;
     use bitcoin::consensus::encode::serialize_hex;
+    use bitcoin::consensus::{deserialize, Decodable};
     use bitcoin::hash_types::TxMerkleNode;
     use bitcoin::hashes::Hash;
     use bitcoin::{BlockHash, CompactTarget};
@@ -187,24 +212,32 @@ pub mod test {
         let ser = serialize(&be);
         let deser = deserialize(&ser).unwrap();
         assert_eq!(be, deser);
+
+        let mut be1 = be;
+        be1.version = 1;
+        let ser = serialize(&be1);
+        let deser = deserialize(&ser).unwrap();
+        assert_eq!(be1, deser);
     }
 
     pub fn block_extra() -> BlockExtra {
+        let block = Block {
+            header: Header {
+                version: Version::from_consensus(0),
+                prev_blockhash: BlockHash::all_zeros(),
+                merkle_root: TxMerkleNode::all_zeros(),
+                time: 0,
+                bits: CompactTarget::from_consensus(0),
+                nonce: 0,
+            },
+            txdata: vec![],
+        };
+        let size = serialize(&block).len() as u32;
         BlockExtra {
             version: 0,
-            block: Block {
-                header: Header {
-                    version: Version::from_consensus(0),
-                    prev_blockhash: BlockHash::all_zeros(),
-                    merkle_root: TxMerkleNode::all_zeros(),
-                    time: 0,
-                    bits: CompactTarget::from_consensus(0),
-                    nonce: 0,
-                },
-                txdata: vec![],
-            },
+            block,
             block_hash: BlockHash::all_zeros(),
-            size: 0,
+            size,
             next: vec![BlockHash::all_zeros()],
             height: 0,
             outpoint_values: {
@@ -236,6 +269,21 @@ pub mod test {
     fn test_hex() {
         let be = block_extra();
         let hex = serialize_hex(&be);
-        assert_eq!(hex, "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffff00000000000000000000000000");
+        assert_eq!(hex, "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005100000001000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffff00000000000000000000000000");
+
+        let mut be1 = be;
+        be1.version = 1;
+        let hex = serialize_hex(&be1);
+        assert_eq!(hex, "0151000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffff00000000000000000000000000");
+    }
+
+    #[test]
+    fn block_extra_unsupported_version() {
+        assert_eq!(
+            "parse failed: Only version 0 and 1 are supported",
+            BlockExtra::consensus_decode(&mut &[2u8][..])
+                .unwrap_err()
+                .to_string()
+        );
     }
 }
