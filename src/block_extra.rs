@@ -1,11 +1,12 @@
 use crate::bitcoin::consensus::{encode, Decodable, Encodable};
 use crate::bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut};
 use crate::FsBlock;
+use bitcoin::io::BufRead;
 use bitcoin::Txid;
 use log::debug;
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::io::{BufReader, Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, Seek, SeekFrom};
 use std::ops::DerefMut;
 
 /// The bitcoin block and additional metadata returned by the [crate::iter()] method
@@ -89,10 +90,14 @@ impl BlockExtra {
 
     /// Returns the fee of a transaction contained in the block
     pub fn tx_fee(&self, tx: &Transaction) -> Option<u64> {
-        let output_total: u64 = tx.output.iter().map(|el| el.value).sum();
+        let output_total: u64 = tx.output.iter().map(|el| el.value.to_sat()).sum();
         let mut input_total = 0u64;
         for input in tx.input.iter() {
-            input_total += self.outpoint_values.get(&input.previous_output)?.value;
+            input_total += self
+                .outpoint_values
+                .get(&input.previous_output)?
+                .value
+                .to_sat();
         }
         Some(input_total - output_total)
     }
@@ -111,7 +116,10 @@ impl BlockExtra {
 }
 
 impl Encodable for BlockExtra {
-    fn consensus_encode<W: Write + ?Sized>(&self, writer: &mut W) -> Result<usize, std::io::Error> {
+    fn consensus_encode<W: bitcoin::io::Write + ?Sized>(
+        &self,
+        writer: &mut W,
+    ) -> Result<usize, bitcoin::io::Error> {
         let mut written = 0;
         written += self.version.consensus_encode(writer)?;
         written += self.block.consensus_encode(writer)?;
@@ -135,7 +143,7 @@ impl Encodable for BlockExtra {
 }
 
 impl Decodable for BlockExtra {
-    fn consensus_decode<D: Read + ?Sized>(d: &mut D) -> Result<Self, encode::Error> {
+    fn consensus_decode<D: BufRead + ?Sized>(d: &mut D) -> Result<Self, encode::Error> {
         Ok(BlockExtra {
             version: Decodable::consensus_decode(d)?,
             block: Decodable::consensus_decode(d)?,
@@ -209,7 +217,7 @@ pub mod test {
             height: 0,
             outpoint_values: {
                 let mut m = HashMap::new();
-                m.insert(OutPoint::default(), TxOut::default());
+                m.insert(OutPoint::default(), TxOut::NULL);
                 m
             },
             block_total_inputs: 0,
