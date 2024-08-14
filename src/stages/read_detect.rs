@@ -1,7 +1,7 @@
 use crate::bitcoin::{BlockHash, Network};
 use crate::{FsBlock, Periodic};
 use bitcoin::hashes::Hash;
-use bitcoin::network::Magic;
+use bitcoin::p2p::Magic;
 use bitcoin_slices::number::{U32, U8};
 use bitcoin_slices::{bsl, Parse};
 use log::info;

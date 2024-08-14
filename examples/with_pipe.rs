@@ -22,7 +22,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         let txs_fee = block_extra.fee().expect("launch without `--skip-prevout`");
         let block = &block_extra.block;
         let coinbase = &block.txdata[0];
-        let coinbase_sum_outputs: u64 = coinbase.output.iter().map(|output| output.value).sum();
+        let coinbase_sum_outputs: u64 = coinbase
+            .output
+            .iter()
+            .map(|output| output.value.to_sat())
+            .sum();
         let base_reward = block_extra.base_reward();
         let missing_reward = base_reward + txs_fee - coinbase_sum_outputs;
 
