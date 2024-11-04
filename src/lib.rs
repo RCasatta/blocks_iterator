@@ -38,7 +38,6 @@ pub use bitcoin;
 pub use fxhash;
 pub use glob;
 pub use log;
-pub use structopt;
 
 pub use block_extra::BlockExtra;
 pub use config::Config;

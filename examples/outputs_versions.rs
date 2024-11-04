@@ -1,20 +1,20 @@
 #![allow(non_snake_case)]
 
 use blocks_iterator::{Config, PeriodCounter};
+use clap::Parser;
 use env_logger::Env;
 use log::info;
 use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::time::Duration;
-use structopt::StructOpt;
 
 fn main() -> Result<(), Box<dyn Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     info!("start");
     let mut period = PeriodCounter::new(Duration::from_secs(10));
 
-    let mut config = Config::from_args();
+    let mut config = Config::parse();
     config.skip_prevout = true;
     let iter = blocks_iterator::iter(config);
     let mut counters = [0usize; 17];

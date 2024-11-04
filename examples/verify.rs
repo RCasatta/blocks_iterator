@@ -2,12 +2,12 @@ use bitcoin::consensus::{deserialize, serialize};
 use bitcoin::{Amount, ScriptBuf, Transaction};
 use bitcoinconsensus::height_to_flags;
 use blocks_iterator::{BlockExtra, Config};
+use clap::Parser;
 use env_logger::Env;
 use log::{debug, error, info};
 use rayon::iter::{ParallelBridge, ParallelIterator};
 use std::error::Error;
 use std::sync::Arc;
-use structopt::StructOpt;
 
 #[derive(Debug)]
 struct VerifyData {
@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     env_logger::Builder::from_env(Env::default().default_filter_or("info")).init();
     info!("start");
 
-    let config = Config::from_args();
+    let config = Config::parse();
 
     let errors: Vec<_> = blocks_iterator::iter(config)
         .flat_map(pre_processing)

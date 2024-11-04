@@ -1,37 +1,37 @@
 use bitcoin::Network;
+use clap::Parser;
 use std::path::{Path, PathBuf};
-use structopt::StructOpt;
 
 /// Configuration parameters, most important the bitcoin blocks directory
-#[derive(StructOpt, Debug, Clone)]
+#[derive(Parser, Debug, Clone)]
 pub struct Config {
     /// Blocks directory (containing `blocks*.dat`)
-    #[structopt(short, long)]
+    #[arg(short, long)]
     pub blocks_dir: PathBuf,
 
     /// Network (bitcoin, testnet, regtest, signet)
-    #[structopt(short, long)]
+    #[arg(short, long)]
     pub network: bitcoin::Network,
 
     /// Skip calculation of previous outputs, it's faster and it uses much less memory
     /// however make it impossible calculate fees or access tx input previous scripts
-    #[structopt(short, long)]
+    #[arg(short, long)]
     pub skip_prevout: bool,
 
     /// Maximum length of a reorg allowed, during reordering send block to the next step only
     /// if it has `max_reorg` following blocks. Higher is more conservative, while lower faster.
     /// When parsing testnet blocks, it may be necessary to increase this a lot
-    #[structopt(short, long, default_value = "6")]
+    #[arg(short, long, default_value = "6")]
     pub max_reorg: u8,
 
     /// Size of the channels used to pass messages between threads
-    #[structopt(short, long, default_value = "0")]
+    #[arg(short, long, default_value = "0")]
     pub channels_size: u8,
 
     #[cfg(feature = "db")]
     /// Specify a **directory** where a rocks database will be created to store the Utxo (when `--skip-prevout` is not used)
     /// Reduce the memory requirements but it's slower and use disk space
-    #[structopt(short, long)]
+    #[arg(short, long)]
     pub utxo_db: Option<PathBuf>,
 
     #[cfg(feature = "redb")]
@@ -40,17 +40,17 @@ pub struct Config {
     ///
     /// Note with feature db you also have the options to use rocksdb, which is faster during creation of the utxo set
     /// but slower to compile.
-    #[structopt(long)]
+    #[arg(long)]
     pub utxo_redb: Option<PathBuf>,
 
     /// Start the blocks iteration at the specified height, note blocks*.dat file are read and
     /// analyzed anyway to follow the blockchain starting at the genesis and populate utxos,
     /// however they are not emitted
-    #[structopt(long, default_value = "0")]
+    #[arg(long, default_value = "0")]
     pub start_at_height: u32,
 
     /// Stop the blocks iteration at the specified height
-    #[structopt(long)]
+    #[arg(long)]
     pub stop_at_height: Option<u32>,
 }
 
