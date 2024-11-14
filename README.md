@@ -12,6 +12,10 @@ Features:
 transactions fee or [verifying](https://github.com/RCasatta/blocks_iterator/blob/master/examples/verify.rs) 
 scripts in the blockchain.
 
+Note:
+
+Bitcoin Core 28.0 introduced xoring of bitcoin blocks and this project doesn't yet support reading the blocks directory when xored. You can disable xoring in core via `-blocksxor=0`.
+
 ## Iteration modes
 
 ### In rust programs
