@@ -1,59 +1,12 @@
-[package]
-name = "blocks_iterator"
-version = "1.0.4"
-authors = ["Riccardo Casatta <riccardo@casatta.it>"]
-edition = "2018"
-description = "Iterates Bitcoin blocks"
-repository = "https://github.com/RCasatta/blocks_iterator"
-documentation = "https://docs.rs/blocks_iterator/"
-keywords = ["bitcoin", "blocks", "iterate"]
-readme = "README.md"
-license = "MIT"
-categories = [
-    "cryptography::cryptocurrencies",
-    "command-line-utilities",
-    "encoding",
+[workspace]
+members = [
+  "lib",
+  "cli"
 ]
+exclude = ["benches"]
 
-[dependencies]
-bitcoin = { version = "0.30", features = ["serde"] }
-clap = { version = "4", features = ["derive"] }
+[workspace.dependencies]
+bitcoin = { version = "0.30" }
+clap = { version = "4" }
 log = "0.4.11"
-glob = "0.3.0"
-fxhash = "0.2.1"
-env_logger = ">=0.10,<0.12"
-bitcoin_slices = { version = "0.6.2", features = ["sha2", "bitcoin"] }
-
-rand = { version = "0.8.4", optional = true }
-rocksdb = { version = "0.22.0", optional = true, default-features = false }
-
-# only for verify example
-bitcoinconsensus = { version = "0.19.2-0.4.1", optional = true }
-
 rayon = "1.5.0"
-thiserror = "1.0.40"
-
-[dev-dependencies]
-tempfile = "3.2.0"
-
-[features]
-default = []
-db = ["rocksdb", "rand"]
-redb = ["bitcoin_slices/redb"]
-consensus = ["bitcoinconsensus", "bitcoin/bitcoinconsensus"]
-
-[[bin]]
-name = "blocks_iterator"
-
-[[example]]
-name = "with_pipe"
-
-[[example]]
-name = "verify"
-required-features = ["consensus"]
-
-[[example]]
-name = "signatures_in_witness"
-
-[[example]]
-name = "outputs_versions"
