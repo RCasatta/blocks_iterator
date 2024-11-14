@@ -8,8 +8,8 @@ Iterates over Bitcoin blocks, decoding data inside Bitcoin Core's blocks directo
 
 Features:
 * Blocks are returned in height order, it avoids following reorgs (see [`Config::max_reorg`] parameter)
-* Blocks come with extra data [`BlockExtra`] like all block's previous outputs, it allows computing 
-transactions fee or [verifying](https://github.com/RCasatta/blocks_iterator/blob/master/examples/verify.rs) 
+* Blocks come with extra data [`BlockExtra`] like all block's previous outputs, it allows computing
+transactions fee or [verifying](https://github.com/RCasatta/blocks_iterator/blob/master/cli/examples/verify.rs)
 scripts in the blockchain.
 
 Note:
@@ -35,9 +35,9 @@ for b in blocks_iterator::iter(conf) {
 assert_eq!(total_fee, 450_000u64);
 ```
 
-When the task to be performed is computational costly, like verifying spending conditions, it is 
-suggested to parallelize the execution like it's done with rayon (or similar) in the 
-[verify](https://github.com/RCasatta/blocks_iterator/blob/master/examples/verify.rs) example 
+When the task to be performed is computational costly, like verifying spending conditions, it is
+suggested to parallelize the execution like it's done with rayon (or similar) in the
+[verify](https://github.com/RCasatta/blocks_iterator/blob/master/cli/examples/verify.rs) example
 (note `par_bridge()` call).
 
 ### Through Pipes
@@ -45,9 +45,9 @@ suggested to parallelize the execution like it's done with rayon (or similar) in
 Other than inside Rust programs, ordered blocks with previous outputs could be iterated using Unix pipes.
 
 ```sh
-$ cargo build --release 
+$ cargo build --release
 $ cargo build --release --examples
-$ ./target/release/blocks_iterator --blocks-dir ~/.bitcoin/testnet3/blocks --network testnet --max-reorg 40 --stop-at-height 200000 | ./target/release/examples/with_pipe
+$ ./target/release/blocks_iterator_cli --blocks-dir ~/.bitcoin/testnet3/blocks --network testnet --max-reorg 40 --stop-at-height 200000 | ./target/release/examples/with_pipe
 ...
 [2023-03-31T15:01:23Z INFO  with_pipe] Max number of txs: 6287 block: 0000000000bc915505318327aa0f18568ce024702a024d7c4a3ecfe80a893d6c
 [2023-03-31T15:01:23Z INFO  with_pipe] total missing reward: 50065529986 in 100 blocks
@@ -58,8 +58,8 @@ If you have more consumer process you can concatenate pipes by passing stdout to
 
 ## Memory requirements and performance
 
-Running (`cargo run --release -- --network X --blocks-dir Y >/dev/null`) on threadripper 1950X, 
-Testnet @ 2130k, Mainnet @ 705k. Spinning disk. Take following benchmarks with a grain of salt 
+Running (`cargo run --release -- --network X --blocks-dir Y >/dev/null`) on threadripper 1950X,
+Testnet @ 2130k, Mainnet @ 705k. Spinning disk. Take following benchmarks with a grain of salt
 since they refer to older versions.
 
 | Network | `--skip--prevout` | `--max-reorg` | `utxo-db` | Memory | Time    |
@@ -89,15 +89,15 @@ Run examples with:
 cargo run --release --example verify
 ```
 
-* [heaviest](examples/heaviest_pipe.rs) find the transaction with greatest weight
-* [most_output](examples/most_output_pipe.rs) find the transaction with most output
-* [outputs_versions](examples/outputs_versions.rs) Count outputs witness version
-* [signatures_in_witness](examples/signatures_in_witness.rs) Count signatures in witness
-* [verify](examples/verify.rs) verify transactions in blocks using libbitcoin-consensus. Consumers are run in parallel fashion.
+* [heaviest](cli/examples/heaviest_pipe.rs) find the transaction with greatest weight
+* [most_output](cli/examples/most_output_pipe.rs) find the transaction with most output
+* [outputs_versions](cli/examples/outputs_versions.rs) Count outputs witness version
+* [signatures_in_witness](cli/examples/signatures_in_witness.rs) Count signatures in witness
+* [verify](cli/examples/verify.rs) verify transactions in blocks using libbitcoin-consensus. Consumers are run in parallel fashion.
 
 ## Version 1.0 meaning
 
-The `1.0` is not to be intended as *battle-tested production-ready* library, the binary format of 
+The `1.0` is not to be intended as *battle-tested production-ready* library, the binary format of
 `BlockExtra` changed and I wanted to highlight it with major version rollout.
 
 ## Similar projects
@@ -111,7 +111,7 @@ The `1.0` is not to be intended as *battle-tested production-ready* library, the
 * [electrs](https://github.com/romanz/electrs) specifically intended for the Electrum protocol
 
 
-## MSRV 
+## MSRV
 
 Check minimum rust version run in CI, as of Aug 2023 is:
 
