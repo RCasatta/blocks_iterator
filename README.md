@@ -24,7 +24,7 @@ Used as a library blocks could be iterated via the [`iter()`] method like:
 
 ```rust
 // "blocks" dir contains first 400 testnet blocks
-let conf = blocks_iterator::Config::new("blocks", bitcoin::Network::Testnet);
+let conf = blocks_iterator::Config::new("../blocks", bitcoin::Network::Testnet);
 let mut total_fee = 0u64;
 for b in blocks_iterator::iter(conf) {
   total_fee += b.fee().expect("fee available cause we are keeping prevouts");
