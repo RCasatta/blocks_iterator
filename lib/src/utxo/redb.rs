@@ -177,10 +177,10 @@ impl UtxoStore for RedbUtxo {
 #[cfg(test)]
 mod test {
     use crate::{inner_test::test_conf, iter};
+    use test_log::test;
 
     #[test]
     fn test_blk_testnet_redb() {
-        let _ = env_logger::try_init();
         let path = tempfile::NamedTempFile::new().unwrap().into_temp_path();
 
         let conf = {

@@ -1,37 +1,39 @@
 use bitcoin::Network;
+#[cfg(feature = "clap")]
 use clap::Parser;
 use std::path::{Path, PathBuf};
 
 /// Configuration parameters, most important the bitcoin blocks directory
-#[derive(Parser, Debug, Clone)]
+#[cfg_attr(feature = "clap", derive(Parser))]
+#[derive(Debug, Clone)]
 pub struct Config {
     /// Blocks directory (containing `blocks*.dat`)
-    #[arg(short, long)]
+    #[cfg_attr(feature = "clap", arg(short, long))]
     pub blocks_dir: PathBuf,
 
     /// Network (bitcoin, testnet, regtest, signet)
-    #[arg(short, long)]
+    #[cfg_attr(feature = "clap", arg(short, long))]
     pub network: bitcoin::Network,
 
     /// Skip calculation of previous outputs, it's faster and it uses much less memory
     /// however make it impossible calculate fees or access tx input previous scripts
-    #[arg(short, long)]
+    #[cfg_attr(feature = "clap", arg(short, long))]
     pub skip_prevout: bool,
 
     /// Maximum length of a reorg allowed, during reordering send block to the next step only
     /// if it has `max_reorg` following blocks. Higher is more conservative, while lower faster.
     /// When parsing testnet blocks, it may be necessary to increase this a lot
-    #[arg(short, long, default_value = "6")]
+    #[cfg_attr(feature = "clap", arg(short, long, default_value = "6"))]
     pub max_reorg: u8,
 
     /// Size of the channels used to pass messages between threads
-    #[arg(short, long, default_value = "0")]
+    #[cfg_attr(feature = "clap", arg(short, long, default_value = "0"))]
     pub channels_size: u8,
 
     #[cfg(feature = "db")]
     /// Specify a **directory** where a rocks database will be created to store the Utxo (when `--skip-prevout` is not used)
     /// Reduce the memory requirements but it's slower and use disk space
-    #[arg(short, long)]
+    #[cfg_attr(feature = "clap", cfg_attr(feature = "clap", arg(short, long)))]
     pub utxo_db: Option<PathBuf>,
 
     #[cfg(feature = "redb")]
@@ -40,17 +42,17 @@ pub struct Config {
     ///
     /// Note with feature db you also have the options to use rocksdb, which is faster during creation of the utxo set
     /// but slower to compile.
-    #[arg(long)]
+    #[cfg_attr(feature = "clap", arg(long))]
     pub utxo_redb: Option<PathBuf>,
 
     /// Start the blocks iteration at the specified height, note blocks*.dat file are read and
     /// analyzed anyway to follow the blockchain starting at the genesis and populate utxos,
     /// however they are not emitted
-    #[arg(long, default_value = "0")]
+    #[cfg_attr(feature = "clap", arg(long, default_value = "0"))]
     pub start_at_height: u32,
 
     /// Stop the blocks iteration at the specified height
-    #[arg(long)]
+    #[cfg_attr(feature = "clap", arg(long))]
     pub stop_at_height: Option<u32>,
 }
 

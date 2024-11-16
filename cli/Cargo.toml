@@ -1,0 +1,43 @@
+[package]
+name = "blocks_iterator_cli"
+version = "1.0.0"
+authors = ["Riccardo Casatta <riccardo@casatta.it>"]
+edition = "2018"
+description = "Iterates Bitcoin blocks"
+repository = "https://github.com/RCasatta/blocks_iterator"
+documentation = "https://docs.rs/blocks_iterator/"
+keywords = ["bitcoin", "blocks", "iterate"]
+readme = "README.md"
+license = "MIT"
+categories = [
+    "cryptography::cryptocurrencies",
+    "command-line-utilities",
+    "encoding",
+]
+
+[features]
+consensus = ["blocks_iterator/consensus"]
+
+[dependencies]
+blocks_iterator = { version = "1.0.4", path = "../lib", features = ["cli"]}
+bitcoin = { workspace = true, features = ["serde"] }
+clap = { workspace = true }
+env_logger = ">=0.10,<0.12"
+log = { workspace = true }
+
+[dev-dependencies]
+bitcoinconsensus = { version = "0.20.2-0.5.0" }
+rayon = { workspace = true }
+
+[[example]]
+name = "with_pipe"
+
+[[example]]
+name = "verify"
+required-features = ["consensus"]
+
+[[example]]
+name = "signatures_in_witness"
+
+[[example]]
+name = "outputs_versions"

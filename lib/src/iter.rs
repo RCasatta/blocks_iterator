@@ -46,7 +46,7 @@ pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
 }
 
 #[deprecated(
-    note = "you can get better and composable results by concateneting method on iter like 
+    note = "you can get better and composable results by concateneting method on iter like
     blocks_iterator::iter(config).flat_map(PREPROC).par_bridge().for_each(TASK)"
 )]
 /// `par_iter` is used when the task to be performed on the blockchain is more costly
@@ -59,7 +59,7 @@ pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
 /// terminated.
 /// Note that access to `STATE` in `TASK` should be done carefully otherwise the contention would
 /// reduce the speed of execution.
-///  
+///
 pub fn par_iter<STATE, PREPROC, TASK, DATA>(
     config: Config,
     state: std::sync::Arc<STATE>,
@@ -116,10 +116,10 @@ mod inner_test {
     use super::*;
     use crate::bitcoin::Network;
     use crate::inner_test::test_conf;
+    use test_log::test;
 
     #[test]
     fn test_iter() {
-        let _ = env_logger::try_init();
         let genesis = genesis_block(Network::Testnet);
         let mut current = genesis.clone();
         for b in iter(test_conf()).skip(1) {
@@ -131,7 +131,6 @@ mod inner_test {
 
     #[test]
     fn test_start_stop() {
-        let _ = env_logger::try_init();
         let mut conf = test_conf();
         conf.start_at_height = 2;
         conf.stop_at_height = Some(10);

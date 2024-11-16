@@ -1,4 +1,4 @@
-#![doc = include_str!("../README.md")]
+#![doc = include_str!("../../README.md")]
 // Coding conventions
 #![forbid(unsafe_code)]
 #![deny(non_upper_case_globals)]
@@ -157,15 +157,14 @@ mod inner_test {
     use crate::bitcoin::Network;
     use crate::{iterate, Config};
     use std::sync::mpsc::sync_channel;
+    use test_log::test;
 
     pub fn test_conf() -> Config {
-        Config::new("blocks", Network::Testnet)
+        Config::new("../blocks", Network::Testnet)
     }
 
     #[test]
     fn test_blk_testnet() {
-        let _ = env_logger::try_init();
-
         let conf = test_conf();
         let (send, recv) = sync_channel(0);
 
@@ -181,8 +180,6 @@ mod inner_test {
     #[cfg(feature = "db")]
     #[test]
     fn test_blk_testnet_db() {
-        let _ = env_logger::try_init();
-
         let tempdir = tempfile::TempDir::new().unwrap();
         let conf = {
             let mut conf = test_conf();

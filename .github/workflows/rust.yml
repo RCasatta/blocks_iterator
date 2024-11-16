@@ -31,8 +31,7 @@ jobs:
         with:
           toolchain: ${{ matrix.toolchain }}
       - run: |
-          cargo update -p is-terminal --precise 0.4.7
-          cargo update -p tempfile --precise 3.6.0
+          cd lib && cargo update -p tempfile --precise 3.6.0
         if: ${{ matrix.toolchain == '1.60.0' }}
       - run: cargo test --no-default-features
       - run: cargo test --features db,redb,consensus
@@ -58,7 +57,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release --no-default-features
       - run: cargo build --release --examples
-      - run: ./target/release/blocks_iterator --blocks-dir blocks --network testnet --max-reorg 40 | ./target/release/examples/with_pipe
+      - run: ./target/release/blocks_iterator_cli --blocks-dir blocks --network testnet --max-reorg 40 | ./target/release/examples/with_pipe
 
   nix:
     runs-on: ubuntu-latest
