@@ -223,7 +223,7 @@ dependencies = [
 
 [[package]]
 name = "blocks_iterator_cli"
-version = "1.0.0"
+version = "1.0.5"
 dependencies = [
  "bitcoin",
  "bitcoinconsensus 0.20.2-0.5.0",
