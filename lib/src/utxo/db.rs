@@ -79,7 +79,7 @@ impl UtxoStore for DbUtxo {
             let mut block_outputs = HashMap::with_capacity(total_outputs);
             for (txid, tx) in block_extra.iter_tx() {
                 for (i, output) in tx.output.iter().enumerate() {
-                    if !output.script_pubkey.is_provably_unspendable() {
+                    if !output.script_pubkey.is_op_return() {
                         let outpoint = OutPoint::new(*txid, i as u32);
                         block_outputs.insert(outpoint, output);
                     }

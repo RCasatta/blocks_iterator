@@ -75,7 +75,7 @@ impl UtxoStore for RedbUtxo {
             let mut block_outputs = HashMap::with_capacity(total_outputs);
             for (txid, tx) in block_extra.iter_tx() {
                 for (i, output) in tx.output.iter().enumerate() {
-                    if !output.script_pubkey.is_provably_unspendable() {
+                    if !output.script_pubkey.is_op_return() {
                         let outpoint = OutPoint::new(*txid, i as u32);
                         block_outputs.insert(outpoint, output);
                     }
@@ -198,7 +198,7 @@ mod test {
             }
             assert!(b.iter_tx().next().is_some());
             for (txid, tx) in b.iter_tx() {
-                assert_eq!(*txid, tx.txid());
+                assert_eq!(*txid, tx.compute_txid());
             }
         }
         assert_eq!(max_height, 400 - conf.max_reorg as u32);

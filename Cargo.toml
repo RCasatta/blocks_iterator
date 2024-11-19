@@ -1,12 +1,9 @@
 [workspace]
-members = [
-  "lib",
-  "cli"
-]
+members = ["lib", "cli"]
 exclude = ["benches"]
 
 [workspace.dependencies]
-bitcoin = { version = "0.30" }
+bitcoin = { version = "0.32" }
 clap = { version = "4" }
 log = "0.4.11"
 rayon = "1.5.0"

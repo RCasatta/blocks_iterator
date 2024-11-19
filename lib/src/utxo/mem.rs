@@ -2,7 +2,7 @@ use crate::bitcoin::{Network, Transaction, Txid};
 use crate::utxo::{Hash64, UtxoStore};
 use crate::BlockExtra;
 use bitcoin::hashes::Hash;
-use bitcoin::{OutPoint, PubkeyHash, ScriptBuf, ScriptHash, TxOut, WPubkeyHash};
+use bitcoin::{Amount, OutPoint, PubkeyHash, ScriptBuf, ScriptHash, TxOut, WPubkeyHash};
 use fxhash::FxHashMap;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hasher};
@@ -24,7 +24,7 @@ impl MemUtxo {
 impl MemUtxo {
     fn add_tx_outputs(&mut self, txid: &Txid, tx: &Transaction) {
         for (i, output) in tx.output.iter().enumerate() {
-            if output.script_pubkey.is_provably_unspendable() {
+            if output.script_pubkey.is_op_return() {
                 self.unspendable += 1;
                 continue;
             }
@@ -107,7 +107,7 @@ impl From<&ScriptBuf> for StackScript {
             StackScript::P2Pkh(PubkeyHash::from_slice(&script.as_bytes()[3..23]).unwrap())
         } else if script.is_p2sh() {
             StackScript::P2Sh(ScriptHash::from_slice(&script.as_bytes()[2..22]).unwrap())
-        } else if script.is_v0_p2wpkh() {
+        } else if script.is_p2wpkh() {
             StackScript::P2V0Wpkh(WPubkeyHash::from_slice(&script.as_bytes()[2..22]).unwrap())
         } else {
             StackScript::Other(script.clone())
@@ -121,7 +121,7 @@ impl From<StackScript> for ScriptBuf {
             StackScript::Other(script) => script,
             StackScript::P2Pkh(h) => ScriptBuf::new_p2pkh(&h),
             StackScript::P2Sh(h) => ScriptBuf::new_p2sh(&h),
-            StackScript::P2V0Wpkh(h) => ScriptBuf::new_v0_p2wpkh(&h),
+            StackScript::P2V0Wpkh(h) => ScriptBuf::new_p2wpkh(&h),
         }
     }
 }
@@ -129,7 +129,8 @@ impl From<StackScript> for ScriptBuf {
 impl TruncMap {
     /// insert a value in the map
     pub fn insert(&mut self, outpoint: OutPoint, tx_out: &TxOut) {
-        let tx_out_stack: (StackScript, u64) = ((&tx_out.script_pubkey).into(), tx_out.value);
+        let tx_out_stack: (StackScript, u64) =
+            ((&tx_out.script_pubkey).into(), tx_out.value.to_sat());
         if tx_out_stack.0.is_other() {
             self.script_other += 1;
         } else {
@@ -153,7 +154,7 @@ impl TruncMap {
         } else {
             self.trunc.remove(&outpoint.hash64()).map(|val| TxOut {
                 script_pubkey: val.0.into(),
-                value: val.1,
+                value: Amount::from_sat(val.1),
             })
         }
     }
@@ -241,7 +242,7 @@ mod test {
         assert_eq!(stack_script, StackScript::P2Sh(hash));
 
         let hash = WPubkeyHash::from_slice(&[7u8; 20]).unwrap();
-        let script = ScriptBuf::new_v0_p2wpkh(&hash);
+        let script = ScriptBuf::new_p2wpkh(&hash);
         let stack_script: StackScript = (&script).into();
         assert_eq!(stack_script, StackScript::P2V0Wpkh(hash));
     }

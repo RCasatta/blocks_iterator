@@ -196,7 +196,7 @@ mod inner_test {
             }
             assert!(b.iter_tx().next().is_some());
             for (txid, tx) in b.iter_tx() {
-                assert_eq!(*txid, tx.txid());
+                assert_eq!(*txid, tx.compute_txid());
             }
         }
         assert_eq!(max_height, 400 - conf.max_reorg as u32);

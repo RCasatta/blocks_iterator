@@ -61,7 +61,7 @@ struct ParsedSignature {
 }
 
 impl Decodable for ParsedSignature {
-    fn consensus_decode<D: std::io::Read + ?Sized>(d: &mut D) -> Result<Self, encode::Error> {
+    fn consensus_decode<D: bitcoin::io::Read + ?Sized>(d: &mut D) -> Result<Self, encode::Error> {
         //TODO fix for schnorr signatures!
         let first = u8::consensus_decode(d)?;
         if first != 0x30 {

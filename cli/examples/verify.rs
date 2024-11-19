@@ -31,7 +31,7 @@ fn pre_processing(mut block_extra: BlockExtra) -> Vec<VerifyData> {
             let data = VerifyData {
                 script_pubkey: prevout.script_pubkey,
                 index: i,
-                amount: Amount::from_sat(prevout.value),
+                amount: prevout.value,
                 spending: arc_tx_bytes.clone(),
                 flags: height_to_flags(block_extra.height),
             };
@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         error!("{:?}", e);
         error!("{:?}", data);
         let tx: Transaction = deserialize(&data.spending).unwrap();
-        error!("tx: {}", tx.txid());
+        error!("tx: {}", tx.compute_txid());
     }
 
     Ok(())
