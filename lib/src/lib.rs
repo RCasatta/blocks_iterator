@@ -1,4 +1,4 @@
-#![doc = include_str!("../../README.md")]
+#![doc = include_str!("../README.md")]
 // Coding conventions
 #![forbid(unsafe_code)]
 #![deny(non_upper_case_globals)]
