@@ -30,12 +30,17 @@
           rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
 
+          crateName = craneLib.crateNameFromCargoToml {
+            cargoToml = ./cli/Cargo.toml;
+          };
+
           # src = craneLib.cleanCargoSource ./.; # filter out md files which are used in docs
           src = nixpkgs.lib.cleanSource (craneLib.path ./.);
 
           nativeBuildInputs = with pkgs; [ rustToolchain clang ];
           buildInputs = with pkgs; [ ];
           commonArgs = {
+            inherit (crateName) pname version;
             inherit src buildInputs nativeBuildInputs;
             LIBCLANG_PATH = "${pkgs.libclang.lib}/lib"; # for rocksdb
 
