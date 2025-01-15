@@ -58,7 +58,7 @@ impl TryFrom<FsBlock> for BlockExtra {
         let block_total_outputs = txs.iter().fold(0usize, |acc, tx| acc + tx.output.len());
 
         Ok(BlockExtra {
-            version: 0,
+            version: fs_block.serialization_version,
             block,
             block_hash: fs_block.hash,
             size: (fs_block.end - fs_block.start) as u32,
