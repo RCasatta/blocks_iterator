@@ -25,16 +25,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         if period.period_elapsed().is_some() {
             info!(
                 "# {:7} {} {:?} sig_wit:{} blk_wit:{}",
-                block_extra.height,
-                block_extra.block_hash,
+                block_extra.height(),
+                block_extra.block_hash(),
                 block_extra.fee(),
                 signatures_in_witness,
                 blocks_with_witness
             );
         }
 
-        for tx in block_extra.block.txdata {
-            for input in tx.input {
+        for tx in &block_extra.block().txdata {
+            for input in &tx.input {
                 for witness in input.witness.iter() {
                     if let Ok(_sig) = deserialize::<ParsedSignature>(witness) {
                         signatures_in_witness += 1;

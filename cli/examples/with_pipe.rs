@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for block_extra in iter {
         let txs_fee = block_extra.fee().expect("launch without `--skip-prevout`");
-        let block = &block_extra.block;
+        let block = &block_extra.block();
         let coinbase = &block.txdata[0];
         let coinbase_sum_outputs: u64 = coinbase
             .output
@@ -36,7 +36,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             warn!(
                 "block {} at height {} tx_fees:{}, coinbase_outputs:{}, missing_reward:{}",
                 block.block_hash(),
-                block_extra.height,
+                block_extra.height(),
                 txs_fee,
                 coinbase_sum_outputs,
                 missing_reward
@@ -47,9 +47,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         if len > block_most_tx.1 {
             info!(
                 "New max number of txs: {} block: {:?}",
-                len, block_extra.block_hash
+                len,
+                block_extra.block_hash()
             );
-            block_most_tx = (block_extra.block_hash, len);
+            block_most_tx = (block_extra.block_hash(), len);
         }
 
         for (txid, tx) in block_extra.iter_tx() {

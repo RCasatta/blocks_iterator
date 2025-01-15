@@ -23,14 +23,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         if period.period_elapsed().is_some() {
             info!(
                 "# {:7} {} counters:{:?}",
-                block_extra.height, block_extra.block_hash, counters
+                block_extra.height(),
+                block_extra.block_hash(),
+                counters
             );
         }
 
-        if block_extra.height == 481824 {
+        if block_extra.height() == 481824 {
             info!("segwit locked in");
         }
-        if block_extra.height == 687456 {
+        if block_extra.height() == 687456 {
             info!("taproot locked in");
         }
 
@@ -45,7 +47,10 @@ fn main() -> Result<(), Box<dyn Error>> {
                     if version >= 1 {
                         let log_line = format!(
                             "tx:{} output:{} version:{} height:{}",
-                            txid, i, version, block_extra.height
+                            txid,
+                            i,
+                            version,
+                            block_extra.height()
                         );
                         info!("{}", log_line);
                         output_file.write_all(log_line.as_bytes()).unwrap();

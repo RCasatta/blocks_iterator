@@ -12,28 +12,28 @@ use std::ops::DerefMut;
 #[derive(Debug, Eq, PartialEq)]
 pub struct BlockExtra {
     /// Serialization format version
-    pub version: u8,
+    pub(crate) version: u8,
     /// The bitcoin block
-    pub block: Block,
+    pub(crate) block: Block,
     /// The bitcoin block hash, same as `block.block_hash()` but result from hashing is cached
-    pub block_hash: BlockHash,
+    pub(crate) block_hash: BlockHash,
     /// The byte size of the block, as returned by in `serialize(block).len()`
-    pub size: u32,
+    pub(crate) size: u32,
     /// Hash of the blocks following this one, it's a vec because during reordering they may be more
     /// than one because of reorgs, as a result from the iteration, it's just one.
-    pub next: Vec<BlockHash>,
+    pub(crate) next: Vec<BlockHash>,
     /// The height of the current block, number of blocks between this one and the genesis block
-    pub height: u32,
+    pub(crate) height: u32,
     /// All the previous outputs of this block. Allowing to validate the script or computing the fee
-    /// Note that when configuration `skip_script_pubkey` is true, the script is empty,
+    /// Note that when configuration `skip_script_pub(crate)key` is true, the script is empty,
     /// when `skip_prevout` is true, this map is empty.
-    pub outpoint_values: HashMap<OutPoint, TxOut>,
+    pub(crate) outpoint_values: HashMap<OutPoint, TxOut>,
     /// Total number of transaction inputs in this block
-    pub block_total_inputs: u32,
+    pub(crate) block_total_inputs: u32,
     /// Total number of transaction outputs in this block
-    pub block_total_outputs: u32,
+    pub(crate) block_total_outputs: u32,
     /// Precomputed transaction hashes such that `txids[i]=block.txdata[i].txid()`
-    pub txids: Vec<Txid>,
+    pub(crate) txids: Vec<Txid>,
 }
 
 impl TryFrom<FsBlock> for BlockExtra {
@@ -73,6 +73,46 @@ impl TryFrom<FsBlock> for BlockExtra {
 }
 
 impl BlockExtra {
+    pub fn version(&self) -> u8 {
+        self.version
+    }
+
+    pub fn block(&self) -> &Block {
+        &self.block
+    }
+
+    pub fn block_hash(&self) -> BlockHash {
+        self.block_hash
+    }
+
+    pub fn size(&self) -> u32 {
+        self.size
+    }
+
+    pub fn next(&self) -> &Vec<BlockHash> {
+        &self.next
+    }
+
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+
+    pub fn outpoint_values(&self) -> &HashMap<OutPoint, TxOut> {
+        &self.outpoint_values
+    }
+
+    pub fn block_total_inputs(&self) -> u32 {
+        self.block_total_inputs
+    }
+
+    pub fn block_total_outputs(&self) -> u32 {
+        self.block_total_outputs
+    }
+
+    pub fn txids(&self) -> &Vec<Txid> {
+        &self.txids
+    }
+
     /// Returns the average transaction fee in the block
     pub fn average_fee(&self) -> Option<f64> {
         Some(self.fee()? as f64 / self.block.txdata.len() as f64)
