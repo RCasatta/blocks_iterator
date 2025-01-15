@@ -1,6 +1,6 @@
 [package]
 name = "blocks_iterator_cli"
-version = "1.0.5"
+version = "2.0.0"
 authors = ["Riccardo Casatta <riccardo@casatta.it>"]
 edition = "2018"
 description = "Iterates Bitcoin blocks"
@@ -19,7 +19,7 @@ categories = [
 consensus = ["blocks_iterator/consensus"]
 
 [dependencies]
-blocks_iterator = { version = "1.0.4", path = "../lib", features = ["cli"]}
+blocks_iterator = { version = "2.0.0", path = "../lib", features = ["cli"] }
 bitcoin = { workspace = true, features = ["serde"] }
 clap = { workspace = true }
 env_logger = ">=0.10,<0.12"
