@@ -172,13 +172,20 @@ mod inner_test {
         let conf = test_conf();
         let (send, recv) = sync_channel(0);
 
+        let mut inputs = 0;
+        let mut outputs = 0;
         let handle = iterate(conf, send);
         while let Some(b) = recv.recv().unwrap() {
             if b.height == 394 {
                 assert_eq!(b.fee(), Some(50_000));
             }
+            inputs += b.block_total_inputs;
+            outputs += b.block_total_outputs;
         }
         handle.join().unwrap();
+
+        assert_eq!(inputs, 448);
+        assert_eq!(outputs, 426);
     }
 
     #[cfg(feature = "db")]
