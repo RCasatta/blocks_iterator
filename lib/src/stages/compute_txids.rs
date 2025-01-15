@@ -68,7 +68,7 @@ impl BlockExtra {
         // without using a thread pool it may interact badly with library consumer using rayon,
         // causing deadlock on the global thread pool
         self.txids = pool.install(|| {
-            self.block
+            self.block()
                 .txdata
                 .par_iter()
                 .map(|tx| tx.compute_txid())

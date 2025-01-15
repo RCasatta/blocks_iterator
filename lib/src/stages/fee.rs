@@ -2,6 +2,7 @@ use crate::utxo::UtxoStore;
 use crate::{BlockExtra, Periodic};
 use bitcoin::{OutPoint, ScriptBuf, TxOut};
 use log::{debug, info, trace};
+use std::collections::HashMap;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
@@ -45,7 +46,7 @@ impl Fee {
                         Some(mut block_extra) => {
                             last_height = block_extra.height;
                             trace!("fee received: {}", block_extra.block_hash);
-                            total_txs += block_extra.block.txdata.len() as u64;
+                            total_txs += block_extra.block().txdata.len() as u64;
 
                             let mut prevouts =
                                 utxo.add_outputs_get_inputs(&block_extra, block_extra.height);
@@ -53,16 +54,18 @@ impl Fee {
                             if block_extra.height >= start_at_height {
                                 let mut prevouts = prevouts.drain(..);
 
-                                for tx in block_extra.block.txdata.iter().skip(1) {
+                                let mut outpoint_values =
+                                    HashMap::with_capacity(block_extra.block_total_inputs());
+                                for tx in block_extra.block().txdata.iter().skip(1) {
                                     for input in tx.input.iter() {
                                         let previous_txout = prevouts.next().unwrap();
 
-                                        block_extra
-                                            .outpoint_values
+                                        outpoint_values
                                             .insert(input.previous_output, previous_txout);
                                     }
                                 }
-                                let coin_base_output_value = block_extra.block.txdata[0]
+                                block_extra.outpoint_values = outpoint_values;
+                                let coin_base_output_value = block_extra.block().txdata[0]
                                     .output
                                     .iter()
                                     .map(|el| el.value)
@@ -90,7 +93,7 @@ impl Fee {
                                     block_extra.height,
                                     block_extra.block_hash,
                                     block_extra.size,
-                                    block_extra.block.txdata.len(),
+                                    block_extra.block().txdata.len(),
                                     total_txs,
                                     block_extra.fee(),
                                 );

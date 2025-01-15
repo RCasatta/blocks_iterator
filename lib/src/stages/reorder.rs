@@ -154,9 +154,9 @@ impl Reorder {
                                     blocks.follows.remove(&block_extra.block_hash);
                                     blocks
                                         .blocks
-                                        .remove(&block_extra.block.header.prev_blockhash);
+                                        .remove(&block_extra.block().header.prev_blockhash);
 
-                                    bench.count_block(&block_extra.block);
+                                    bench.count_block(&block_extra.block());
                                     if let Some(stats) = bench.period_elapsed() {
                                         info!(
                                             "# {:7} {}",

@@ -14,7 +14,7 @@ pub struct BlockExtra {
     /// Serialization format version
     pub(crate) version: u8,
     /// The bitcoin block
-    pub(crate) block: Block,
+    block: Block,
     /// The bitcoin block hash, same as `block.block_hash()` but result from hashing is cached
     pub(crate) block_hash: BlockHash,
     /// The byte size of the block, as returned by in `serialize(block).len()`
@@ -101,12 +101,12 @@ impl BlockExtra {
         &self.outpoint_values
     }
 
-    pub fn block_total_inputs(&self) -> u32 {
-        self.block_total_inputs
+    pub fn block_total_inputs(&self) -> usize {
+        self.block_total_inputs as usize
     }
 
-    pub fn block_total_outputs(&self) -> u32 {
-        self.block_total_outputs
+    pub fn block_total_outputs(&self) -> usize {
+        self.block_total_outputs as usize
     }
 
     pub fn txids(&self) -> &Vec<Txid> {

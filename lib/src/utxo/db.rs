@@ -64,7 +64,7 @@ fn serialize_prevouts_height(h: i32) -> [u8; 5] {
 
 impl UtxoStore for DbUtxo {
     fn add_outputs_get_inputs(&mut self, block_extra: &BlockExtra, height: u32) -> Vec<TxOut> {
-        let block = &block_extra.block;
+        let block = block_extra.block();
         let mut outpoint_buffer = [0u8; 37]; // prefix(1) + txid (32) + vout (4)
         let mut txout_buffer = [0u8; 10_011]; // max(script) (10_000) +  max(varint) (3) + value (8)  (there are exceptions, see where used)
 
