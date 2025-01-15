@@ -18,22 +18,22 @@ struct VerifyData {
     flags: u32,
 }
 
-fn pre_processing(mut block_extra: BlockExtra) -> Vec<VerifyData> {
+fn pre_processing(block_extra: BlockExtra) -> Vec<VerifyData> {
     let mut vec = vec![];
-    for tx in block_extra.block.txdata.iter().skip(1) {
+    for tx in block_extra.block().txdata.iter().skip(1) {
         let tx_bytes = serialize(tx);
         let arc_tx_bytes = Arc::new(tx_bytes);
         for (i, input) in tx.input.iter().enumerate() {
             let prevout = block_extra
-                .outpoint_values
-                .remove(&input.previous_output)
+                .outpoint_values()
+                .get(&input.previous_output)
                 .unwrap();
             let data = VerifyData {
-                script_pubkey: prevout.script_pubkey,
+                script_pubkey: prevout.script_pubkey.clone(),
                 index: i,
                 amount: prevout.value,
                 spending: arc_tx_bytes.clone(),
-                flags: height_to_flags(block_extra.height),
+                flags: height_to_flags(block_extra.height()),
             };
             vec.push(data);
         }
