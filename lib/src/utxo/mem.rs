@@ -226,7 +226,7 @@ mod test {
         assert_eq!(std::mem::size_of::<WScriptHash>(), 32);
         assert_eq!(std::mem::size_of::<Box<[u8]>>(), 16);
         assert_eq!(std::mem::size_of::<(StackScript, u64)>(), 40);
-        assert_eq!(std::mem::size_of::<FsBlock>(), 112);
+        assert_eq!(std::mem::size_of::<FsBlock>(), 120);
     }
 
     #[test]

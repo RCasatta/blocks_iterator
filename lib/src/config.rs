@@ -54,6 +54,10 @@ pub struct Config {
     /// Stop the blocks iteration at the specified height
     #[cfg_attr(feature = "clap", arg(long))]
     pub stop_at_height: Option<u32>,
+
+    /// The serialization format to use for the generated `BlockExtra`
+    #[cfg_attr(feature = "clap", arg(long, default_value = "1"))]
+    pub serialization_version: u8,
 }
 
 impl Config {
@@ -71,6 +75,7 @@ impl Config {
             utxo_redb: None,
             start_at_height: 0,
             stop_at_height: None,
+            serialization_version: 1,
         }
     }
 

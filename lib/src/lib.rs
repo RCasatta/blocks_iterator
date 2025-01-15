@@ -77,6 +77,9 @@ pub struct FsBlock {
     /// The hash of the blocks following this one. It is populated during the reorder phase, it can
     /// be more than one because of reorgs.
     pub next: Vec<BlockHash>,
+
+    /// The serialization format to use when trasformed to `BlockExtra` (0 or 1)
+    pub serialization_version: u8,
 }
 
 fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {
@@ -91,6 +94,7 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
             config.network,
             early_stop.clone(),
             send_block_fs,
+            config.serialization_version,
         );
 
         let (send_ordered_blocks, receive_ordered_blocks) =

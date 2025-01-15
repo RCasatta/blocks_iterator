@@ -49,7 +49,7 @@ pub struct DetectedBlock {
 }
 
 impl DetectedBlock {
-    fn into_fs_block(self, file: &Arc<Mutex<File>>) -> FsBlock {
+    fn into_fs_block(self, file: &Arc<Mutex<File>>, serialization_version: u8) -> FsBlock {
         FsBlock {
             start: self.start,
             end: self.end,
@@ -57,6 +57,7 @@ impl DetectedBlock {
             prev: self.prev,
             file: Arc::clone(file),
             next: vec![],
+            serialization_version,
         }
     }
 }
@@ -67,6 +68,7 @@ impl ReadDetect {
         network: Network,
         early_stop: Arc<AtomicBool>,
         sender: SyncSender<Option<Vec<FsBlock>>>,
+        serialization_version: u8,
     ) -> Self {
         let mut periodic = Periodic::new(Duration::from_secs(60));
         let mut vec = Vec::with_capacity(135_000_000);
@@ -100,7 +102,7 @@ impl ReadDetect {
                     let fs_blocks: Vec<_> = detected_blocks
                         .into_iter()
                         .filter(|e| seen.insert(&e.hash))
-                        .map(|e| e.into_fs_block(&file))
+                        .map(|e| e.into_fs_block(&file, serialization_version))
                         .collect();
 
                     // TODO if 0 blocks found, maybe wrong directory
