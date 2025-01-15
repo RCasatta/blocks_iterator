@@ -78,7 +78,7 @@ impl UtxoStore for DbUtxo {
             let total_outputs = block.txdata.iter().map(|e| e.output.len()).sum();
             let mut block_outputs = HashMap::with_capacity(total_outputs);
             for (txid, tx) in block_extra.iter_tx() {
-                for (i, output) in tx.output.iter().enumerate() {
+                for (i, output) in tx.output.into_iter().enumerate() {
                     if !output.script_pubkey.is_op_return() {
                         let outpoint = OutPoint::new(*txid, i as u32);
                         block_outputs.insert(outpoint, output);
@@ -114,7 +114,7 @@ impl UtxoStore for DbUtxo {
                 serialize_outpoint(&k, &mut outpoint_buffer);
                 if v.script_pubkey.len() <= 10_000 {
                     // max script size for spendable output is 10k https://bitcoin.stackexchange.com/a/35881/6693 ...
-                    let used = serialize_txout(v, &mut txout_buffer);
+                    let used = serialize_txout(&v, &mut txout_buffer);
                     batch.put(&outpoint_buffer[..], &txout_buffer[..used]);
                 } else {
                     // ... however there are bigger unspendable output like testnet 73e64e38faea386c88a578fd1919bcdba3d0b3af7b6302bf6ee1b423dc4e4333:0

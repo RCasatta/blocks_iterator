@@ -80,6 +80,12 @@ pub struct FsBlock {
 
     /// The serialization format to use when trasformed to `BlockExtra` (0 or 1)
     pub serialization_version: u8,
+
+    /// Total number of transaction inputs in this block
+    pub(crate) block_total_inputs: u32,
+
+    /// Total number of transaction outputs in this block
+    pub(crate) block_total_outputs: u32,
 }
 
 fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {

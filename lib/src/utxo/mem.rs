@@ -37,7 +37,7 @@ impl UtxoStore for MemUtxo {
     fn add_outputs_get_inputs(&mut self, block_extra: &BlockExtra, _height: u32) -> Vec<TxOut> {
         let block = block_extra.block();
         for (txid, tx) in block_extra.iter_tx() {
-            self.add_tx_outputs(txid, tx);
+            self.add_tx_outputs(txid, &tx);
         }
         let total_inputs = block.txdata.iter().skip(1).map(|e| e.input.len()).sum();
         let mut prevouts = Vec::with_capacity(total_inputs);
@@ -226,7 +226,7 @@ mod test {
         assert_eq!(std::mem::size_of::<WScriptHash>(), 32);
         assert_eq!(std::mem::size_of::<Box<[u8]>>(), 16);
         assert_eq!(std::mem::size_of::<(StackScript, u64)>(), 40);
-        assert_eq!(std::mem::size_of::<FsBlock>(), 120);
+        assert_eq!(std::mem::size_of::<FsBlock>(), 128);
     }
 
     #[test]

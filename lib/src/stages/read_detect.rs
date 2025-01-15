@@ -3,7 +3,7 @@ use crate::{FsBlock, Periodic};
 use bitcoin::hashes::Hash;
 use bitcoin::p2p::Magic;
 use bitcoin_slices::number::{U32, U8};
-use bitcoin_slices::{bsl, Parse};
+use bitcoin_slices::{bsl, Parse, Visit};
 use log::info;
 use std::collections::HashSet;
 use std::convert::TryInto;
@@ -46,6 +46,8 @@ pub struct DetectedBlock {
     end: usize,
     hash: BlockHash,
     prev: BlockHash,
+    inputs: u32,
+    outputs: u32,
 }
 
 impl DetectedBlock {
@@ -58,6 +60,8 @@ impl DetectedBlock {
             file: Arc::clone(file),
             next: vec![],
             serialization_version,
+            block_total_inputs: self.inputs,
+            block_total_outputs: self.outputs,
         }
     }
 }
@@ -155,7 +159,8 @@ pub fn detect(buffer: &[u8], magic: Magic) -> Result<Vec<DetectedBlock>, bitcoin
         let size: u32 = size.parsed().into();
         pointer += 4;
         let start = pointer;
-        match bsl::Block::parse(remaining) {
+        let mut visitor = InputsOutputsCounter::new();
+        match bsl::Block::visit(remaining, &mut visitor) {
             Ok(block) => {
                 pointer += block.consumed();
                 current = block.remaining();
@@ -171,6 +176,8 @@ pub fn detect(buffer: &[u8], magic: Magic) -> Result<Vec<DetectedBlock>, bitcoin
                     end,
                     hash,
                     prev,
+                    inputs: visitor.inputs,
+                    outputs: visitor.outputs,
                 };
                 detected_blocks.push(detected_block);
             }
@@ -178,6 +185,30 @@ pub fn detect(buffer: &[u8], magic: Magic) -> Result<Vec<DetectedBlock>, bitcoin
         }
     }
     Ok(detected_blocks)
+}
+
+struct InputsOutputsCounter {
+    inputs: u32,
+    outputs: u32,
+}
+
+impl InputsOutputsCounter {
+    fn new() -> Self {
+        Self {
+            inputs: 0,
+            outputs: 0,
+        }
+    }
+}
+
+impl bitcoin_slices::Visitor for InputsOutputsCounter {
+    fn visit_tx_ins(&mut self, total_inputs: usize) {
+        self.inputs += total_inputs as u32;
+    }
+
+    fn visit_tx_outs(&mut self, total_outputs: usize) {
+        self.outputs += total_outputs as u32;
+    }
 }
 
 /// Implements a rolling u32, every time a new u8 is `push`ed the old value is shifted by 1 byte

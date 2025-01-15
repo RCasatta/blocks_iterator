@@ -1,11 +1,12 @@
 use crate::bitcoin::consensus::{encode, Decodable, Encodable};
 use crate::bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut};
 use crate::FsBlock;
+use bitcoin::consensus::serialize;
 use bitcoin::Txid;
 use log::debug;
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::io::{BufReader, Seek, SeekFrom};
+use std::io::{Read, Seek, SeekFrom};
 use std::ops::DerefMut;
 
 /// The bitcoin block and additional metadata returned by the [crate::iter()] method
@@ -13,25 +14,37 @@ use std::ops::DerefMut;
 pub struct BlockExtra {
     /// Serialization format version
     pub(crate) version: u8,
-    /// The bitcoin block
-    block: Block,
+
+    /// The bitcoin block bytes.
+    ///
+    /// We store only the bytes because users can potentially avoid instantiating the [`bitcoin::Block`]
+    /// avoiding the performance costs and use visitor directly on the bytes with [`bitcoin_slices`]
+    block_bytes: Vec<u8>,
+
     /// The bitcoin block hash, same as `block.block_hash()` but result from hashing is cached
     pub(crate) block_hash: BlockHash,
+
     /// The byte size of the block, as returned by in `serialize(block).len()`
     pub(crate) size: u32,
+
     /// Hash of the blocks following this one, it's a vec because during reordering they may be more
     /// than one because of reorgs, as a result from the iteration, it's just one.
     pub(crate) next: Vec<BlockHash>,
+
     /// The height of the current block, number of blocks between this one and the genesis block
     pub(crate) height: u32,
+
     /// All the previous outputs of this block. Allowing to validate the script or computing the fee
     /// Note that when configuration `skip_script_pub(crate)key` is true, the script is empty,
     /// when `skip_prevout` is true, this map is empty.
     pub(crate) outpoint_values: HashMap<OutPoint, TxOut>,
+
     /// Total number of transaction inputs in this block
     pub(crate) block_total_inputs: u32,
+
     /// Total number of transaction outputs in this block
     pub(crate) block_total_outputs: u32,
+
     /// Precomputed transaction hashes such that `txids[i]=block.txdata[i].txid()`
     pub(crate) txids: Vec<Txid>,
 }
@@ -49,24 +62,20 @@ impl TryFrom<FsBlock> for BlockExtra {
         file.seek(SeekFrom::Start(fs_block.start as u64))
             .map_err(|e| err(e.to_string(), &fs_block))?;
         debug!("going to read: {:?}", file);
-        let mut reader = BufReader::new(file);
-        let block =
-            Block::consensus_decode(&mut reader).map_err(|e| err(e.to_string(), &fs_block))?;
-
-        let txs = &block.txdata;
-        let block_total_inputs = txs.iter().fold(0usize, |acc, tx| acc + tx.input.len());
-        let block_total_outputs = txs.iter().fold(0usize, |acc, tx| acc + tx.output.len());
+        let mut block_bytes = vec![0u8; fs_block.end - fs_block.start];
+        file.read_exact(&mut block_bytes)
+            .map_err(|e| err(e.to_string(), &fs_block))?;
 
         Ok(BlockExtra {
             version: fs_block.serialization_version,
-            block,
+            block_bytes,
             block_hash: fs_block.hash,
             size: (fs_block.end - fs_block.start) as u32,
             next: fs_block.next,
             height: 0,
-            outpoint_values: HashMap::with_capacity(block_total_inputs),
-            block_total_inputs: block_total_inputs as u32,
-            block_total_outputs: block_total_outputs as u32,
+            outpoint_values: HashMap::with_capacity(fs_block.block_total_inputs as usize),
+            block_total_inputs: fs_block.block_total_inputs,
+            block_total_outputs: fs_block.block_total_outputs,
             txids: vec![],
         })
     }
@@ -77,8 +86,11 @@ impl BlockExtra {
         self.version
     }
 
-    pub fn block(&self) -> &Block {
-        &self.block
+    /// Returns the block from the bytes
+    ///
+    /// This is an expensive operations, re-use the results instead of calling it multiple times
+    pub fn block(&self) -> Block {
+        Block::consensus_decode(&mut &self.block_bytes[..]).unwrap()
     }
 
     pub fn block_hash(&self) -> BlockHash {
@@ -115,13 +127,13 @@ impl BlockExtra {
 
     /// Returns the average transaction fee in the block
     pub fn average_fee(&self) -> Option<f64> {
-        Some(self.fee()? as f64 / self.block.txdata.len() as f64)
+        Some(self.fee()? as f64 / self.block().txdata.len() as f64)
     }
 
     /// Returns the total fee of the block
     pub fn fee(&self) -> Option<u64> {
         let mut total = 0u64;
-        for tx in self.block.txdata.iter() {
+        for tx in self.block().txdata.iter() {
             total += self.tx_fee(tx)?;
         }
         Some(total)
@@ -149,8 +161,10 @@ impl BlockExtra {
     }
 
     /// Iterate transactions of blocks together with their txids
-    pub fn iter_tx(&self) -> impl Iterator<Item = (&Txid, &Transaction)> {
-        self.txids.iter().zip(self.block.txdata.iter())
+    ///
+    /// requires serializing the block bytes, consider using a visitor on the bytes for performance
+    pub fn iter_tx(&self) -> impl Iterator<Item = (&Txid, Transaction)> {
+        self.txids.iter().zip(self.block().txdata.into_iter())
     }
 }
 
@@ -164,7 +178,8 @@ impl Encodable for BlockExtra {
         if self.version == 1 {
             written += self.size.consensus_encode(writer)?;
         }
-        written += self.block.consensus_encode(writer)?;
+        writer.write_all(&self.block_bytes)?;
+        written += self.block_bytes.len();
         written += self.block_hash.consensus_encode(writer)?;
         if self.version == 0 {
             written += self.size.consensus_encode(writer)?;
@@ -189,18 +204,20 @@ impl Encodable for BlockExtra {
 impl Decodable for BlockExtra {
     fn consensus_decode<D: bitcoin::io::Read + ?Sized>(d: &mut D) -> Result<Self, encode::Error> {
         let version = Decodable::consensus_decode(d)?;
-        let (size, block, block_hash) = match version {
+        let (size, block_bytes, block_hash) = match version {
             0 => {
-                let block = Decodable::consensus_decode(d)?;
+                let block = Block::consensus_decode(d)?;
+                let block_bytes = serialize(&block);
                 let block_hash = Decodable::consensus_decode(d)?;
                 let size = Decodable::consensus_decode(d)?;
-                (size, block, block_hash)
+                (size, block_bytes, block_hash)
             }
             1 => {
                 let size = Decodable::consensus_decode(d)?;
-                let block = Decodable::consensus_decode(d)?;
+                let mut block_bytes = vec![0u8; size as usize];
+                d.read_exact(&mut block_bytes)?;
                 let block_hash = Decodable::consensus_decode(d)?;
-                (size, block, block_hash)
+                (size, block_bytes, block_hash)
             }
             _ => {
                 return Err(encode::Error::ParseFailed(
@@ -210,7 +227,7 @@ impl Decodable for BlockExtra {
         };
         Ok(BlockExtra {
             version,
-            block,
+            block_bytes,
             block_hash,
             size,
             next: Decodable::consensus_decode(d)?,
@@ -279,10 +296,12 @@ pub mod test {
             },
             txdata: vec![],
         };
-        let size = serialize(&block).len() as u32;
+        let block_bytes = serialize(&block);
+        let size = block_bytes.len() as u32;
+
         BlockExtra {
             version: 0,
-            block,
+            block_bytes,
             block_hash: BlockHash::all_zeros(),
             size,
             next: vec![BlockHash::all_zeros()],

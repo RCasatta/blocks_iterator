@@ -74,7 +74,7 @@ impl UtxoStore for RedbUtxo {
             let total_outputs = block.txdata.iter().map(|e| e.output.len()).sum();
             let mut block_outputs = HashMap::with_capacity(total_outputs);
             for (txid, tx) in block_extra.iter_tx() {
-                for (i, output) in tx.output.iter().enumerate() {
+                for (i, output) in tx.output.into_iter().enumerate() {
                     if !output.script_pubkey.is_op_return() {
                         let outpoint = OutPoint::new(*txid, i as u32);
                         block_outputs.insert(outpoint, output);
