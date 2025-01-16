@@ -127,13 +127,14 @@ impl BlockExtra {
 
     /// Returns the average transaction fee in the block
     pub fn average_fee(&self) -> Option<f64> {
-        Some(self.fee()? as f64 / self.block().txdata.len() as f64)
+        Some(self.fee()? as f64 / self.txids.len() as f64)
     }
 
     /// Returns the total fee of the block
     pub fn fee(&self) -> Option<u64> {
         let mut total = 0u64;
         for tx in self.block().txdata.iter() {
+            // TODO: avoid self.block()
             total += self.tx_fee(tx)?;
         }
         Some(total)
