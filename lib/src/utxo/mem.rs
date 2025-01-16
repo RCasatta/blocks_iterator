@@ -39,8 +39,7 @@ impl UtxoStore for MemUtxo {
         for (txid, tx) in block_extra.iter_tx() {
             self.add_tx_outputs(txid, &tx);
         }
-        let total_inputs = block.txdata.iter().skip(1).map(|e| e.input.len()).sum();
-        let mut prevouts = Vec::with_capacity(total_inputs);
+        let mut prevouts = Vec::with_capacity(block_extra.block_total_inputs());
         for tx in block.txdata.iter().skip(1) {
             for input in tx.input.iter() {
                 let tx_out = self.map.remove(&input.previous_output).unwrap();
