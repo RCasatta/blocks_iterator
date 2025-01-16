@@ -50,12 +50,13 @@ impl Fee {
 
                             let mut prevouts =
                                 utxo.add_outputs_get_inputs(&block_extra, block_extra.height);
-                            let block = block_extra.block();
                             if block_extra.height >= start_at_height {
                                 let mut prevouts = prevouts.drain(..);
 
                                 let mut outpoint_values =
                                     HashMap::with_capacity(block_extra.block_total_inputs());
+                                let block = block_extra.block().expect("block is not loaded");
+
                                 for tx in block.txdata.iter().skip(1) {
                                     for input in tx.input.iter() {
                                         let previous_txout = prevouts.next().unwrap();
@@ -64,9 +65,10 @@ impl Fee {
                                             .insert(input.previous_output, previous_txout);
                                     }
                                 }
-                                block_extra.outpoint_values = outpoint_values;
                                 let coin_base_output_value =
                                     block.txdata[0].output.iter().map(|el| el.value).sum();
+                                block_extra.outpoint_values = outpoint_values;
+
                                 block_extra.outpoint_values.insert(
                                     OutPoint::default(),
                                     TxOut {

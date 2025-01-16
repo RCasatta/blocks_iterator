@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             );
         }
 
-        for tx in &block_extra.block().txdata {
+        for tx in &block_extra.block().expect("block is not loaded").txdata {
             for input in &tx.input {
                 for witness in input.witness.iter() {
                     if let Ok(_sig) = deserialize::<ParsedSignature>(witness) {

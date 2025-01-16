@@ -58,7 +58,7 @@ impl RedbUtxo {
 
 impl UtxoStore for RedbUtxo {
     fn add_outputs_get_inputs(&mut self, block_extra: &BlockExtra, height: u32) -> Vec<TxOut> {
-        let block = &block_extra.block();
+        let block = block_extra.block().expect("block is not loaded");
         // let mut outpoint_buffer = [0u8; 36]; // txid (32) + vout (4)
 
         // max script size for spendable output is 10k https://bitcoin.stackexchange.com/a/35881/6693 ...
@@ -74,10 +74,10 @@ impl UtxoStore for RedbUtxo {
             let total_outputs = block.txdata.iter().map(|e| e.output.len()).sum();
             let mut block_outputs = HashMap::with_capacity(total_outputs);
             for (txid, tx) in block_extra.iter_tx() {
-                for (i, output) in tx.output.into_iter().enumerate() {
+                for (i, output) in tx.output.iter().enumerate() {
                     if !output.script_pubkey.is_op_return() {
                         let outpoint = OutPoint::new(*txid, i as u32);
-                        block_outputs.insert(outpoint, output);
+                        block_outputs.insert(outpoint, output.clone());
                     }
                 }
             }

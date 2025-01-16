@@ -64,7 +64,6 @@ fn serialize_prevouts_height(h: i32) -> [u8; 5] {
 
 impl UtxoStore for DbUtxo {
     fn add_outputs_get_inputs(&mut self, block_extra: &BlockExtra, height: u32) -> Vec<TxOut> {
-        let block = block_extra.block();
         let mut outpoint_buffer = [0u8; 37]; // prefix(1) + txid (32) + vout (4)
         let mut txout_buffer = [0u8; 10_011]; // max(script) (10_000) +  max(varint) (3) + value (8)  (there are exceptions, see where used)
 
@@ -74,11 +73,13 @@ impl UtxoStore for DbUtxo {
             height, self.updated_up_to_height
         );
         if height > self.updated_up_to_height {
+            let block = block_extra.block().expect("block is not loaded");
+
             // since we can spend outputs created in this same block, we first put outputs in memory...
-            let total_outputs = block.txdata.iter().map(|e| e.output.len()).sum();
+            let total_outputs = block_extra.block_total_outputs();
             let mut block_outputs = HashMap::with_capacity(total_outputs);
             for (txid, tx) in block_extra.iter_tx() {
-                for (i, output) in tx.output.into_iter().enumerate() {
+                for (i, output) in tx.output.iter().enumerate() {
                     if !output.script_pubkey.is_op_return() {
                         let outpoint = OutPoint::new(*txid, i as u32);
                         block_outputs.insert(outpoint, output);
@@ -86,8 +87,7 @@ impl UtxoStore for DbUtxo {
                 }
             }
 
-            let total_inputs = block.txdata.iter().skip(1).map(|e| e.input.len()).sum();
-            let mut prevouts = Vec::with_capacity(total_inputs);
+            let mut prevouts = Vec::with_capacity(block_extra.block_total_inputs());
             let mut batch = WriteBatch::default();
             for tx in block.txdata.iter().skip(1) {
                 for input in tx.input.iter() {
@@ -135,7 +135,7 @@ impl UtxoStore for DbUtxo {
             batch.put([HEIGHT_PREFIX], height.to_ne_bytes());
             self.db.write(batch).unwrap(); // TODO unwrap
             prevouts
-        } else if block.txdata.len() == 1 {
+        } else if block_extra.block_total_txs == 1 {
             // avoid hitting disk when we have only the coinbase (no prevouts!)
             Vec::new()
         } else {

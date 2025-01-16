@@ -147,14 +147,14 @@ impl Reorder {
                                 while let Some(block_to_send) = blocks.remove(&next) {
                                     let mut block_extra: BlockExtra =
                                         block_to_send.try_into().unwrap();
-
+                                    block_extra.init_block();
                                     busy_time += now.elapsed().as_nanos();
                                     next = block_extra.next[0];
                                     block_extra.height = height;
                                     blocks.follows.remove(&block_extra.block_hash);
-                                    blocks
-                                        .blocks
-                                        .remove(&block_extra.block().header.prev_blockhash);
+                                    let block = block_extra.block().expect("block is not loaded");
+
+                                    blocks.blocks.remove(&block.header.prev_blockhash);
 
                                     bench.count_block(&block_extra);
                                     if let Some(stats) = bench.period_elapsed() {
