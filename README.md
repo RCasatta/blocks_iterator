@@ -16,6 +16,7 @@ Note:
 
 Bitcoin Core 28.0 introduced xoring of bitcoin blocks and this project doesn't yet support reading the blocks directory when xored. You can disable xoring in core via `-blocksxor=0`.
 
+
 ## Iteration modes
 
 ### In rust programs
@@ -55,6 +56,15 @@ $ ./target/release/blocks_iterator_cli --blocks-dir ~/.bitcoin/testnet3/blocks -
 ```
 
 If you have more consumer process you can concatenate pipes by passing stdout to `PipeIterator::new` or using `tee` utility to split the stdout of blocks_iterator. The latter is better because it doesn't require re-serialization of the data.
+
+
+## Binary version
+
+When using pipes, data is serialized and deserialized.
+
+blocks_iterator 1.x produce serialized BlockExtra with version 0 and read version 0.
+blocks_iterator 2.x produce serialized BlockExtra with version 1 and read version 0 and 1.
+The binary format has been changed so that version 1 can deserialize only the block bytes, without instantiating the Block struct. By doing so, light clients can use bitcoin_slices to visit the block data in faster way.
 
 ## Memory requirements and performance
 
