@@ -191,6 +191,7 @@ mod inner_test {
             if b.height == 394 {
                 assert_eq!(b.fee(), Some(50_000));
                 assert_eq!(b.txids(), &vec![t1, t2, t3]);
+                assert_eq!(b.block_total_txs, 3);
             }
 
             inputs += b.block_total_inputs;

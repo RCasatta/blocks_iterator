@@ -68,6 +68,7 @@ impl BlockExtra {
         let mut visitor = TxidsVisitor::new(); // TODO add tx_count to block_extra and use it as capacity
         bsl::Block::visit(self.block_bytes(), &mut visitor).expect("compute txids");
         self.txids = visitor.txids;
+        self.block_total_txs = self.txids.len();
     }
 }
 

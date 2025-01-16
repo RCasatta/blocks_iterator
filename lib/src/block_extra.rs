@@ -48,6 +48,11 @@ pub struct BlockExtra {
 
     /// Precomputed transaction hashes such that `txids[i]=block.txdata[i].txid()`
     pub(crate) txids: Vec<Txid>,
+
+    /// Total number of transaction in this block
+    ///
+    /// This field is usize because it's not serialized, it's derived from the lenght of txids
+    pub(crate) block_total_txs: usize,
 }
 
 impl TryFrom<FsBlock> for BlockExtra {
@@ -78,6 +83,7 @@ impl TryFrom<FsBlock> for BlockExtra {
             block_total_inputs: fs_block.block_total_inputs,
             block_total_outputs: fs_block.block_total_outputs,
             txids: vec![],
+            block_total_txs: 0,
         })
     }
 }
@@ -132,7 +138,7 @@ impl BlockExtra {
 
     /// Returns the average transaction fee in the block
     pub fn average_fee(&self) -> Option<f64> {
-        Some(self.fee()? as f64 / self.txids.len() as f64)
+        Some(self.fee()? as f64 / self.block_total_txs as f64)
     }
 
     /// Returns the total fee of the block
@@ -228,7 +234,7 @@ impl Decodable for BlockExtra {
                 ));
             }
         };
-        Ok(BlockExtra {
+        let mut b = BlockExtra {
             version,
             block_bytes,
             block_hash,
@@ -256,7 +262,10 @@ impl Decodable for BlockExtra {
                 }
                 v
             },
-        })
+            block_total_txs: 0, // To be initialized
+        };
+        b.block_total_txs = b.txids.len();
+        Ok(b)
     }
 }
 
@@ -350,6 +359,7 @@ pub mod test {
             },
             block_total_inputs: 0,
             block_total_outputs: 0,
+            block_total_txs: 0,
             txids: vec![],
         }
     }

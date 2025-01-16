@@ -90,7 +90,7 @@ impl Fee {
                                     block_extra.height,
                                     block_extra.block_hash,
                                     block_extra.size,
-                                    block_extra.txids.len(),
+                                    block_extra.block_total_txs,
                                     total_txs,
                                     block_extra.fee(),
                                 );

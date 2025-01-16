@@ -1,8 +1,9 @@
-use bitcoin::Block;
 use std::fmt;
 use std::fmt::Formatter;
 use std::time::Duration;
 use std::time::Instant;
+
+use crate::BlockExtra;
 
 /// Contains counter and instants to provide per period stats over transaction and blocks processed
 #[derive(Debug)]
@@ -47,12 +48,12 @@ impl PeriodCounter {
     }
 
     /// Count statistics of the given block
-    pub fn count_block(&mut self, block: &Block) {
+    pub fn count_block(&mut self, block_extra: &BlockExtra) {
         self.stats.current.blocks += 1;
-        self.stats.current.txs += block.txdata.len() as u64;
+        self.stats.current.txs += block_extra.block_total_txs as u64;
 
         self.stats.total.blocks += 1;
-        self.stats.total.txs += block.txdata.len() as u64;
+        self.stats.total.txs += block_extra.block_total_txs as u64;
     }
 
     /// If `self.period` has passed since last invocation return stats
