@@ -83,6 +83,9 @@ pub struct FsBlock {
 
     /// Total number of transaction outputs in this block
     pub(crate) block_total_outputs: u32,
+
+    /// Total number of transactions in this block
+    pub(crate) block_total_txs: u32,
 }
 
 fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {

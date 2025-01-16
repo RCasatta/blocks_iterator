@@ -48,6 +48,7 @@ pub struct DetectedBlock {
     prev: BlockHash,
     inputs: u32,
     outputs: u32,
+    txs: u32,
 }
 
 impl DetectedBlock {
@@ -62,6 +63,7 @@ impl DetectedBlock {
             serialization_version,
             block_total_inputs: self.inputs,
             block_total_outputs: self.outputs,
+            block_total_txs: self.txs,
         }
     }
 }
@@ -159,7 +161,7 @@ pub fn detect(buffer: &[u8], magic: Magic) -> Result<Vec<DetectedBlock>, bitcoin
         let size: u32 = size.parsed().into();
         pointer += 4;
         let start = pointer;
-        let mut visitor = InputsOutputsCounter::new();
+        let mut visitor = InputsOutputsTxsCounter::new();
         match bsl::Block::visit(remaining, &mut visitor) {
             Ok(block) => {
                 pointer += block.consumed();
@@ -178,6 +180,7 @@ pub fn detect(buffer: &[u8], magic: Magic) -> Result<Vec<DetectedBlock>, bitcoin
                     prev,
                     inputs: visitor.inputs,
                     outputs: visitor.outputs,
+                    txs: visitor.txs,
                 };
                 detected_blocks.push(detected_block);
             }
@@ -187,27 +190,34 @@ pub fn detect(buffer: &[u8], magic: Magic) -> Result<Vec<DetectedBlock>, bitcoin
     Ok(detected_blocks)
 }
 
-struct InputsOutputsCounter {
+struct InputsOutputsTxsCounter {
     inputs: u32,
     outputs: u32,
+    txs: u32,
 }
 
-impl InputsOutputsCounter {
+impl InputsOutputsTxsCounter {
     fn new() -> Self {
         Self {
             inputs: 0,
             outputs: 0,
+            txs: 0,
         }
     }
 }
 
-impl bitcoin_slices::Visitor for InputsOutputsCounter {
+impl bitcoin_slices::Visitor for InputsOutputsTxsCounter {
     fn visit_tx_ins(&mut self, total_inputs: usize) {
         self.inputs += total_inputs as u32;
     }
 
     fn visit_tx_outs(&mut self, total_outputs: usize) {
         self.outputs += total_outputs as u32;
+    }
+
+    fn visit_transaction(&mut self, _tx: &bsl::Transaction) -> core::ops::ControlFlow<()> {
+        self.txs += 1;
+        core::ops::ControlFlow::Continue(())
     }
 }
 

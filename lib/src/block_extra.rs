@@ -87,7 +87,7 @@ impl TryFrom<FsBlock> for BlockExtra {
             block_total_inputs: fs_block.block_total_inputs,
             block_total_outputs: fs_block.block_total_outputs,
             txids: vec![],
-            block_total_txs: 0,
+            block_total_txs: fs_block.block_total_txs as usize,
         })
     }
 }
