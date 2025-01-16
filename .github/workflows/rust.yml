@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: ["verify --features consensus", "signatures_in_witness", "outputs_versions"]
+        example: ["verify --features consensus,rayon", "signatures_in_witness", "outputs_versions"]
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable

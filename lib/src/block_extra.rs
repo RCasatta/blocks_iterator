@@ -93,6 +93,10 @@ impl BlockExtra {
         Block::consensus_decode(&mut &self.block_bytes[..]).unwrap()
     }
 
+    pub fn block_bytes(&self) -> &[u8] {
+        &self.block_bytes
+    }
+
     pub fn block_hash(&self) -> BlockHash {
         self.block_hash
     }

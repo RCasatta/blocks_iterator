@@ -45,9 +45,6 @@ pub use error::Error;
 pub use iter::iter;
 pub use pipe::PipeIterator;
 
-#[allow(deprecated)]
-pub use iter::par_iter;
-
 /// Before reorder we keep only the position of the block in the file system and data relative
 /// to the block hash, the previous hash and the following hash (populated during reorder phase)
 /// We will need
@@ -166,6 +163,8 @@ pub fn periodic_log_level(i: u32, every: u32) -> Level {
 mod inner_test {
     use crate::bitcoin::Network;
     use crate::{iterate, Config};
+    use bitcoin::Txid;
+    use std::str::FromStr;
     use std::sync::mpsc::sync_channel;
     use test_log::test;
 
@@ -184,7 +183,15 @@ mod inner_test {
         while let Some(b) = recv.recv().unwrap() {
             if b.height == 394 {
                 assert_eq!(b.fee(), Some(50_000));
+                assert_eq!(
+                    b.txids(),
+                    &vec![Txid::from_str(
+                        "0000000000000000000000000000000000000000000000000000000000000000"
+                    )
+                    .unwrap()]
+                );
             }
+
             inputs += b.block_total_inputs;
             outputs += b.block_total_outputs;
         }

@@ -1,7 +1,10 @@
 use crate::BlockExtra;
+use bitcoin::Txid;
+use bitcoin_slices::bsl;
+use bitcoin_slices::Visit;
+use bitcoin_slices::Visitor;
 use log::info;
-use rayon::prelude::*;
-use rayon::ThreadPool;
+use std::ops::ControlFlow;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
@@ -32,10 +35,6 @@ impl ComputeTxids {
                 info!("starting compute tx ids");
                 let mut now = Instant::now();
                 let mut busy_time = Duration::default();
-                let pool = rayon::ThreadPoolBuilder::new()
-                    .num_threads(4)
-                    .build()
-                    .unwrap();
                 loop {
                     busy_time += now.elapsed();
                     let received = receiver.recv().unwrap();
@@ -44,7 +43,7 @@ impl ComputeTxids {
                         Some(mut block_extra) => {
                             if !skip_prevout || block_extra.height >= start_at_height {
                                 // always send if we are not skipping prevouts, otherwise only if height is enough
-                                block_extra.compute_txids(&pool);
+                                block_extra.compute_txids();
                                 busy_time += now.elapsed();
                                 sender.send(Some(block_extra)).unwrap();
                                 now = Instant::now();
@@ -61,18 +60,30 @@ impl ComputeTxids {
 }
 
 impl BlockExtra {
-    fn compute_txids(&mut self, pool: &ThreadPool) {
+    fn compute_txids(&mut self) {
         if !self.txids.is_empty() {
             return;
         }
-        // without using a thread pool it may interact badly with library consumer using rayon,
-        // causing deadlock on the global thread pool
-        self.txids = pool.install(|| {
-            self.block()
-                .txdata
-                .par_iter()
-                .map(|tx| tx.compute_txid())
-                .collect()
-        });
+
+        let mut visitor = TxidsVisitor::new(); // TODO add tx_count to block_extra and use it as capacity
+        bsl::Block::visit(self.block_bytes(), &mut visitor).expect("compute txids");
+        self.txids = visitor.txids;
+    }
+}
+
+struct TxidsVisitor {
+    txids: Vec<Txid>,
+}
+
+impl TxidsVisitor {
+    fn new() -> Self {
+        Self { txids: vec![] }
+    }
+}
+
+impl Visitor for TxidsVisitor {
+    fn visit_transaction(&mut self, tx: &bsl::Transaction) -> ControlFlow<()> {
+        self.txids.push(tx.txid().into());
+        ControlFlow::Continue(())
     }
 }

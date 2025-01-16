@@ -6,4 +6,3 @@ exclude = ["benches"]
 bitcoin = { version = "0.32" }
 clap = { version = "4" }
 log = "0.4.11"
-rayon = "1.5.0"
