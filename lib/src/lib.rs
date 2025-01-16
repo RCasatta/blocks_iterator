@@ -180,16 +180,17 @@ mod inner_test {
         let mut inputs = 0;
         let mut outputs = 0;
         let handle = iterate(conf, send);
+        let t1 = Txid::from_str("63375db7e443e491c99bcf46ce49422d05708f83b65335c935dee0a06855ebff")
+            .unwrap();
+        let t2 = Txid::from_str("0280d22f8aaa210b9ec8509067ecc523bf79609d8378cc56196857848cf42ce4")
+            .unwrap();
+        let t3 = Txid::from_str("b3c19d78b4953b694717a47d9852f8ea1ccd4cf93a45ba2e43a0f97d7cdb2655")
+            .unwrap();
+
         while let Some(b) = recv.recv().unwrap() {
             if b.height == 394 {
                 assert_eq!(b.fee(), Some(50_000));
-                assert_eq!(
-                    b.txids(),
-                    &vec![Txid::from_str(
-                        "0000000000000000000000000000000000000000000000000000000000000000"
-                    )
-                    .unwrap()]
-                );
+                assert_eq!(b.txids(), &vec![t1, t2, t3]);
             }
 
             inputs += b.block_total_inputs;
