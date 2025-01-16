@@ -29,9 +29,12 @@ struct BlocksTxs {
 
 impl BlocksTxs {
     fn blocks(&self) -> u64 {
+        self.blocks
+    }
+    fn blocks_per_sec(&self) -> u64 {
         ((self.blocks as u128 * 1000u128) / self.period.as_millis()) as u64
     }
-    fn txs(&self) -> u64 {
+    fn txs_per_sec(&self) -> u64 {
         ((self.txs as u128 * 1000u128) / self.period.as_millis()) as u64
     }
 }
@@ -75,11 +78,12 @@ impl fmt::Display for Stats {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Current: {:>5} blk/s; {:>6} txs/s; Total: {:>5} blk/s; {:>6} tx/s;",
-            self.current.blocks(),
-            self.current.txs(),
+            "Current {}: {:>5} blk/s; {:>6} txs/s; Total: {:>5} blk/s; {:>6} tx/s;",
             self.total.blocks(),
-            self.total.txs()
+            self.current.blocks_per_sec(),
+            self.current.txs_per_sec(),
+            self.total.blocks_per_sec(),
+            self.total.txs_per_sec()
         )
     }
 }
