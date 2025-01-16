@@ -59,8 +59,9 @@ mod inner_test {
         let genesis = genesis_block(Network::Testnet);
         let mut current = genesis.clone();
         for b in iter(test_conf()).skip(1) {
-            assert_eq!(current.block_hash(), b.block().header.prev_blockhash);
-            current = b.block().clone();
+            let block = b.block();
+            assert_eq!(current.block_hash(), block.header.prev_blockhash);
+            current = block;
         }
         assert_ne!(genesis, current);
     }
