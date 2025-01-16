@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::io::{Read, Seek, SeekFrom};
 use std::ops::DerefMut;
+use std::sync::OnceLock;
 
 /// The bitcoin block and additional metadata returned by the [crate::iter()] method
 #[derive(Debug, Eq, PartialEq)]
@@ -22,7 +23,7 @@ pub struct BlockExtra {
     /// avoiding the performance costs and use visitor directly on the bytes with [`bitcoin_slices`]
     block_bytes: Vec<u8>,
 
-    block: Option<Block>,
+    block: OnceLock<Block>,
 
     /// The bitcoin block hash, same as `block.block_hash()` but result from hashing is cached
     pub(crate) block_hash: BlockHash,
@@ -77,7 +78,7 @@ impl TryFrom<FsBlock> for BlockExtra {
         Ok(BlockExtra {
             version: fs_block.serialization_version,
             block_bytes,
-            block: None,
+            block: OnceLock::new(),
             block_hash: fs_block.hash,
             size: (fs_block.end - fs_block.start) as u32,
             next: fs_block.next,
@@ -98,13 +99,10 @@ impl BlockExtra {
 
     /// Returns the block from the bytes
     ///
-    /// This is an expensive operations, re-use the results instead of calling it multiple times
-    pub fn block(&self) -> Option<&Block> {
-        self.block.as_ref()
-    }
-
-    pub fn init_block(&mut self) {
-        self.block = Some(Block::consensus_decode(&mut &self.block_bytes[..]).unwrap());
+    /// This is an expensive operation, re-use the results instead of calling it multiple times
+    pub fn block(&self) -> &Block {
+        self.block
+            .get_or_init(|| Block::consensus_decode(&mut &self.block_bytes[..]).unwrap())
     }
 
     pub fn block_bytes(&self) -> &[u8] {
@@ -180,9 +178,7 @@ impl BlockExtra {
     ///
     /// requires serializing the block bytes, consider using a visitor on the bytes for performance
     pub fn iter_tx(&self) -> impl Iterator<Item = (&Txid, &Transaction)> {
-        self.txids
-            .iter()
-            .zip(self.block().expect("block not loaded").txdata.iter())
+        self.txids.iter().zip(self.block().txdata.iter())
     }
 }
 
@@ -246,7 +242,7 @@ impl Decodable for BlockExtra {
         let mut b = BlockExtra {
             version,
             block_bytes,
-            block: None,
+            block: OnceLock::new(),
             block_hash,
             size,
             next: Decodable::consensus_decode(d)?,
@@ -325,6 +321,7 @@ pub mod test {
     use bitcoin::hashes::Hash;
     use bitcoin::{BlockHash, CompactTarget};
     use std::collections::HashMap;
+    use std::sync::OnceLock;
 
     #[test]
     fn block_extra_round_trip() {
@@ -358,7 +355,7 @@ pub mod test {
         BlockExtra {
             version: 0,
             block_bytes,
-            block: None,
+            block: OnceLock::new(),
             block_hash: BlockHash::all_zeros(),
             size,
             next: vec![BlockHash::all_zeros()],

@@ -55,7 +55,7 @@ impl Fee {
 
                                 let mut outpoint_values =
                                     HashMap::with_capacity(block_extra.block_total_inputs());
-                                let block = block_extra.block().expect("block is not loaded");
+                                let block = block_extra.block();
 
                                 for tx in block.txdata.iter().skip(1) {
                                     for input in tx.input.iter() {

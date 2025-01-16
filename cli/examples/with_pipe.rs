@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for block_extra in iter {
         let txs_fee = block_extra.fee().expect("launch without `--skip-prevout`");
-        let block = block_extra.block().expect("block is not loaded");
+        let block = block_extra.block();
         let coinbase = &block.txdata[0];
         let coinbase_sum_outputs: u64 = coinbase
             .output

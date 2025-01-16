@@ -73,7 +73,7 @@ impl UtxoStore for DbUtxo {
             height, self.updated_up_to_height
         );
         if height > self.updated_up_to_height {
-            let block = block_extra.block().expect("block is not loaded");
+            let block = block_extra.block();
 
             // since we can spend outputs created in this same block, we first put outputs in memory...
             let total_outputs = block_extra.block_total_outputs();

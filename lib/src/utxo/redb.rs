@@ -58,7 +58,7 @@ impl RedbUtxo {
 
 impl UtxoStore for RedbUtxo {
     fn add_outputs_get_inputs(&mut self, block_extra: &BlockExtra, height: u32) -> Vec<TxOut> {
-        let block = block_extra.block().expect("block is not loaded");
+        let block = block_extra.block();
         // let mut outpoint_buffer = [0u8; 36]; // txid (32) + vout (4)
 
         // max script size for spendable output is 10k https://bitcoin.stackexchange.com/a/35881/6693 ...
