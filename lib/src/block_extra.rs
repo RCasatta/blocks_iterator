@@ -149,7 +149,6 @@ impl BlockExtra {
     pub fn fee(&self) -> Option<u64> {
         let mut total = 0u64;
         for tx in self.block().txdata.iter() {
-            // TODO: avoid self.block()
             total += self.tx_fee(tx)?;
         }
         Some(total)
