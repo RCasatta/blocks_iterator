@@ -3,7 +3,6 @@ use crate::bitcoin::{Block, BlockHash, OutPoint, Transaction, TxOut};
 use crate::FsBlock;
 use bitcoin::consensus::serialize;
 use bitcoin::Txid;
-use bitcoin_slices::{bsl, Visit, Visitor};
 use log::debug;
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -148,9 +147,12 @@ impl BlockExtra {
 
     /// Returns the total fee of the block
     pub fn fee(&self) -> Option<u64> {
-        let mut fee_visitor = TxFeeVisitor::new(&self.outpoint_values);
-        bsl::Block::visit(self.block_bytes(), &mut fee_visitor).expect("compute fee");
-        Some(fee_visitor.total())
+        let mut total = 0u64;
+        for tx in self.block().txdata.iter() {
+            // TODO: avoid self.block()
+            total += self.tx_fee(tx)?;
+        }
+        Some(total)
     }
 
     /// Returns the fee of a transaction contained in the block
@@ -272,40 +274,6 @@ impl Decodable for BlockExtra {
         };
         b.block_total_txs = b.txids.len();
         Ok(b)
-    }
-}
-
-struct TxFeeVisitor<'a> {
-    outpoint_values: &'a HashMap<OutPoint, TxOut>,
-    input_total: u64,
-    output_total: u64,
-}
-impl<'a> TxFeeVisitor<'a> {
-    fn new(outpoint_values: &'a HashMap<OutPoint, TxOut>) -> Self {
-        Self {
-            outpoint_values,
-            input_total: 0,
-            output_total: 0,
-        }
-    }
-    fn total(&self) -> u64 {
-        self.input_total - self.output_total
-    }
-}
-
-impl Visitor for TxFeeVisitor<'_> {
-    fn visit_tx_out(&mut self, _vout: usize, tx_out: &bsl::TxOut) -> core::ops::ControlFlow<()> {
-        self.output_total += tx_out.value();
-        core::ops::ControlFlow::Continue(())
-    }
-    fn visit_tx_in(&mut self, _vin: usize, tx_in: &bsl::TxIn) -> core::ops::ControlFlow<()> {
-        self.input_total += self
-            .outpoint_values
-            .get(&tx_in.prevout().into())
-            .unwrap() // TODO
-            .value
-            .to_sat();
-        core::ops::ControlFlow::Continue(())
     }
 }
 
