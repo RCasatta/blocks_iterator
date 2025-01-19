@@ -38,9 +38,12 @@ pub struct BlockExtra {
     pub(crate) height: u32,
 
     /// All the previous outputs of this block. Allowing to validate the script or computing the fee
-    /// Note that when configuration `skip_script_pub(crate)key` is true, the script is empty,
+    /// Note that when configuration `skip_script_pub_key` is true, the script is empty,
     /// when `skip_prevout` is true, this map is empty.
-    pub(crate) outpoint_values: HashMap<OutPoint, TxOut>,
+    pub(crate) outpoint_values: OnceLock<HashMap<OutPoint, TxOut>>,
+
+    /// When deserializing we populate this vec and instantiate the map at first access
+    pub(crate) outpoint_values_vec: Vec<(OutPoint, TxOut)>,
 
     /// Total number of transaction inputs in this block
     pub(crate) block_total_inputs: u32,
@@ -82,7 +85,8 @@ impl TryFrom<FsBlock> for BlockExtra {
             size: (fs_block.end - fs_block.start) as u32,
             next: fs_block.next,
             height: 0,
-            outpoint_values: HashMap::with_capacity(fs_block.block_total_inputs as usize),
+            outpoint_values: OnceLock::new(),
+            outpoint_values_vec: Vec::with_capacity(fs_block.block_total_inputs as usize),
             block_total_inputs: fs_block.block_total_inputs,
             block_total_outputs: fs_block.block_total_outputs,
             txids: vec![],
@@ -125,7 +129,12 @@ impl BlockExtra {
     }
 
     pub fn outpoint_values(&self) -> &HashMap<OutPoint, TxOut> {
-        &self.outpoint_values
+        self.outpoint_values.get_or_init(|| {
+            self.outpoint_values_vec
+                .iter()
+                .cloned()
+                .collect::<HashMap<_, _>>()
+        })
     }
 
     pub fn block_total_inputs(&self) -> usize {
@@ -160,7 +169,7 @@ impl BlockExtra {
         let mut input_total = 0u64;
         for input in tx.input.iter() {
             input_total += self
-                .outpoint_values
+                .outpoint_values()
                 .get(&input.previous_output)?
                 .value
                 .to_sat();
@@ -201,8 +210,8 @@ impl Encodable for BlockExtra {
         }
         written += self.next.consensus_encode(writer)?;
         written += self.height.consensus_encode(writer)?;
-        written += (self.outpoint_values.len() as u32).consensus_encode(writer)?;
-        for (out_point, tx_out) in self.outpoint_values.iter() {
+        written += (self.outpoint_values_vec.len() as u32).consensus_encode(writer)?;
+        for (out_point, tx_out) in self.outpoint_values_vec.iter() {
             written += out_point.consensus_encode(writer)?;
             written += tx_out.consensus_encode(writer)?;
         }
@@ -248,14 +257,15 @@ impl Decodable for BlockExtra {
             size,
             next: Decodable::consensus_decode(d)?,
             height: Decodable::consensus_decode(d)?,
-            outpoint_values: {
+            outpoint_values: OnceLock::new(),
+            outpoint_values_vec: {
                 let len = u32::consensus_decode(d)?;
-                let mut m = HashMap::with_capacity(len as usize);
+                let mut m = Vec::with_capacity(len as usize);
                 for _ in 0..len {
-                    m.insert(
+                    m.push((
                         Decodable::consensus_decode(d)?,
                         Decodable::consensus_decode(d)?,
-                    );
+                    ));
                 }
                 m
             },
@@ -287,7 +297,6 @@ pub mod test {
     use bitcoin::hash_types::TxMerkleNode;
     use bitcoin::hashes::Hash;
     use bitcoin::{BlockHash, CompactTarget};
-    use std::collections::HashMap;
     use std::sync::OnceLock;
 
     #[test]
@@ -331,11 +340,12 @@ pub mod test {
             size,
             next: vec![BlockHash::all_zeros()],
             height: 0,
-            outpoint_values: {
-                let mut m = HashMap::new();
-                m.insert(OutPoint::default(), TxOut::NULL);
+            outpoint_values_vec: {
+                let mut m = Vec::new();
+                m.push((OutPoint::default(), TxOut::NULL));
                 m
             },
+            outpoint_values: OnceLock::new(),
             block_total_inputs: 0,
             block_total_outputs: 0,
             block_total_txs: 0,

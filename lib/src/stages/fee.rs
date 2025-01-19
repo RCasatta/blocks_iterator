@@ -2,7 +2,6 @@ use crate::utxo::UtxoStore;
 use crate::{BlockExtra, Periodic};
 use bitcoin::{OutPoint, ScriptBuf, TxOut};
 use log::{debug, info, trace};
-use std::collections::HashMap;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
 use std::thread::JoinHandle;
@@ -53,29 +52,28 @@ impl Fee {
                             if block_extra.height >= start_at_height {
                                 let mut prevouts = prevouts.drain(..);
 
-                                let mut outpoint_values =
-                                    HashMap::with_capacity(block_extra.block_total_inputs());
+                                let mut outpoint_values_vec =
+                                    Vec::with_capacity(block_extra.block_total_inputs());
                                 let block = block_extra.block();
 
                                 for tx in block.txdata.iter().skip(1) {
                                     for input in tx.input.iter() {
                                         let previous_txout = prevouts.next().unwrap();
 
-                                        outpoint_values
-                                            .insert(input.previous_output, previous_txout);
+                                        outpoint_values_vec
+                                            .push((input.previous_output, previous_txout));
                                     }
                                 }
                                 let coin_base_output_value =
                                     block.txdata[0].output.iter().map(|el| el.value).sum();
-                                block_extra.outpoint_values = outpoint_values;
-
-                                block_extra.outpoint_values.insert(
+                                outpoint_values_vec.push((
                                     OutPoint::default(),
                                     TxOut {
                                         script_pubkey: ScriptBuf::new(),
                                         value: coin_base_output_value,
                                     },
-                                );
+                                ));
+                                block_extra.outpoint_values_vec = outpoint_values_vec;
 
                                 if periodic.elapsed() {
                                     info!("{}", utxo.stat());
