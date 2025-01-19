@@ -1,6 +1,7 @@
-use bitcoin_slices::bsl::parse_len;
+use bitcoin_slices::bsl::scan_len;
+use bitcoin_slices::number::{read_u32, read_u8};
 use bitcoin_slices::{bsl, Parse, ParseResult};
-use bitcoin_slices::{number::U32, number::U8, read_slice, SResult, Visit, Visitor};
+use bitcoin_slices::{SResult, Visit, Visitor};
 
 struct BlockExtra<'a> {
     slice: &'a [u8],
@@ -14,17 +15,15 @@ impl<'a> AsRef<[u8]> for BlockExtra<'a> {
 
 impl<'a> Visit<'a> for BlockExtra<'a> {
     fn visit<'b, V: Visitor>(slice: &'a [u8], visit: &'b mut V) -> SResult<'a, Self> {
-        let version = U8::parse(slice)?;
-        let version_int: u8 = version.parsed().into();
-        dbg!(version_int);
+        let version = read_u8(slice)?;
         let mut consumed = 1;
 
-        let block_size = if version_int == 0 {
+        let block_size = if version == 0 {
             let block = bsl::Block::visit(&slice[consumed..], visit)?;
             consumed += block.consumed();
             None
-        } else if version_int == 1 {
-            let block_size = U32::parse(&slice[consumed..])?;
+        } else if version == 1 {
+            let block_size = read_u32(&slice[consumed..])?;
             consumed += 4;
             let block = bsl::Block::visit(&slice[consumed..], visit)?;
             consumed += block.consumed();
@@ -32,49 +31,42 @@ impl<'a> Visit<'a> for BlockExtra<'a> {
         } else {
             panic!("invalid version")
         };
-        dbg!(consumed);
 
-        let block_hash = read_slice(&slice[consumed..], 32)?;
+        let _block_hash = slice
+            .get(consumed..consumed + 32)
+            .ok_or(bitcoin_slices::Error::MoreBytesNeeded)?;
         consumed += 32;
 
         if block_size.is_none() {
-            let _ = U32::parse(block_hash.remaining())?;
+            let _ = read_u32(&slice[consumed..])?;
             consumed += 4;
         }
 
-        dbg!(consumed);
-        let next_len = parse_len(&slice[consumed..])?;
-        consumed += next_len.consumed();
+        let next_len = scan_len(&slice[consumed..], &mut consumed)? as usize;
+        consumed += 32 * next_len;
 
-        for _ in 0..next_len.n() {
-            let _ = read_slice(&slice[consumed..], 32)?;
-            consumed += 32;
-        }
-
-        let _ = U32::parse(&slice[consumed..])?;
+        let _ = read_u32(&slice[consumed..])?;
         consumed += 4;
 
-        let map_len = U32::parse(&slice[consumed..])?;
+        let map_len = read_u32(&slice[consumed..])?;
         consumed += 4;
 
-        for _ in 0u32..map_len.parsed().into() {
+        for _ in 0u32..map_len {
             // add visit extra call
             let outpoint = bsl::OutPoint::parse(&slice[consumed..])?;
             consumed += outpoint.consumed();
             let txout = bsl::TxOut::parse(&slice[consumed..])?;
             consumed += txout.consumed();
         }
-        let _ = U32::parse(&slice[consumed..])?;
+        let _ = read_u32(&slice[consumed..])?;
         consumed += 4;
-        let _ = U32::parse(&slice[consumed..])?;
+        let _ = read_u32(&slice[consumed..])?;
         consumed += 4;
-        let txids_len = U32::parse(&slice[consumed..])?;
+        let txids_len = read_u32(&slice[consumed..])? as usize;
         consumed += 4;
 
-        for _ in 0u32..txids_len.parsed().into() {
-            let _ = read_slice(&slice[consumed..], 32)?;
-            consumed += 32;
-        }
+        consumed += 32 * txids_len;
+
         let (slice, remaining) = slice.split_at(consumed);
         let block_extra = BlockExtra { slice };
         Ok(ParseResult::new(remaining, block_extra))

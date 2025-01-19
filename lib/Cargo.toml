@@ -21,7 +21,7 @@ clap = { workspace = true, optional = true, features = ["derive"] }
 log = { workspace = true }
 glob = "0.3.0"
 fxhash = "0.2.1"
-bitcoin_slices = { version = "0.9.0", features = ["sha2", "bitcoin"] }
+bitcoin_slices = { version = "0.10.0", features = ["sha2", "bitcoin"] }
 
 rand = { version = "0.8.4", optional = true }
 rocksdb = { version = "0.22.0", optional = true, default-features = false }
