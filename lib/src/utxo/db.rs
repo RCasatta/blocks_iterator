@@ -114,7 +114,7 @@ impl UtxoStore for DbUtxo {
                 serialize_outpoint(&k, &mut outpoint_buffer);
                 if v.script_pubkey.len() <= 10_000 {
                     // max script size for spendable output is 10k https://bitcoin.stackexchange.com/a/35881/6693 ...
-                    let used = serialize_txout(&v, &mut txout_buffer);
+                    let used = serialize_txout(v, &mut txout_buffer);
                     batch.put(&outpoint_buffer[..], &txout_buffer[..used]);
                 } else {
                     // ... however there are bigger unspendable output like testnet 73e64e38faea386c88a578fd1919bcdba3d0b3af7b6302bf6ee1b423dc4e4333:0

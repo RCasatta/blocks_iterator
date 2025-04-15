@@ -340,11 +340,7 @@ pub mod test {
             size,
             next: vec![BlockHash::all_zeros()],
             height: 0,
-            outpoint_values_vec: {
-                let mut m = Vec::new();
-                m.push((OutPoint::default(), TxOut::NULL));
-                m
-            },
+            outpoint_values_vec: vec![(OutPoint::default(), TxOut::NULL)],
             outpoint_values: OnceLock::new(),
             block_total_inputs: 0,
             block_total_outputs: 0,

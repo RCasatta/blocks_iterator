@@ -37,7 +37,7 @@ impl UtxoStore for MemUtxo {
     fn add_outputs_get_inputs(&mut self, block_extra: &BlockExtra, _height: u32) -> Vec<TxOut> {
         let block = block_extra.block();
         for (txid, tx) in block_extra.iter_tx() {
-            self.add_tx_outputs(txid, &tx);
+            self.add_tx_outputs(txid, tx);
         }
         let mut prevouts = Vec::with_capacity(block_extra.block_total_inputs());
         for tx in block.txdata.iter().skip(1) {
