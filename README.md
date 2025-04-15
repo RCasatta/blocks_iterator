@@ -119,6 +119,9 @@ The `1.0` is not to be intended as *battle-tested production-ready* library, the
   * It is making two passage over `blocks*.dat` serially, while blocks_iterator is doing two passes in parallel.
 * [rust-bitcoin-indexer](https://github.com/dpc/rust-bitcoin-indexer) this project requires longer setup times (about 9 hours indexing) and a postgre database, once the indexing is finished it allows fast queries on relational database.
 * [electrs](https://github.com/romanz/electrs) specifically intended for the Electrum protocol
+* [brk_parser](https://github.com/bitcoinresearchkit/brk/tree/main/crates/brk_parser) (which is part of the [Bitcoin Research Kit](https://github.com/bitcoinresearchkit/brk)) is a Rust-only version of this project which heavily leans on channels ([crossbeam](https://crates.io/crates/crossbeam)) and parallelization ([rayon](https://crates.io/crates/rayon)) to be [faster](https://github.com/bitcoinresearchkit/brk/blob/main/crates/brk_parser/README.md#benchmark). \
+  It also supports XORed blocks and thus Bitcoin Core v28.0+ without needing any particular parameter. \
+  A CLI built on top of `brk_parser` with a much larger scope [is available](https://github.com/bitcoinresearchkit/brk/tree/main/crates/brk_cli) which supports querying via the terminal but can also index a node, compute a substantial number of datasets and host both a front-end and an API.
 
 
 ## MSRV
