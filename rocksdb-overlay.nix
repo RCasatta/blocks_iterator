@@ -1,13 +1,13 @@
 final: prev: {
 
   rocksdb = prev.rocksdb.overrideAttrs (oldAttrs: rec {
-    version = "8.10.0";
+    version = "10.4.2";
 
     src = final.fetchFromGitHub {
       owner = "facebook";
       repo = oldAttrs.pname;
       rev = "v${version}";
-      hash = "sha256-KGsYDBc1fz/90YYNGwlZ0LUKXYsP1zyhP29TnRQwgjQ=";
+      hash = "sha256-mKh6zsmxsiUix4LX+npiytmKvLbo6WNA9y4Ns/EY+bE=";
     };
   });
 }
