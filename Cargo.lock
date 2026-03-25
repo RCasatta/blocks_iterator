@@ -157,9 +157,9 @@ dependencies = [
 
 [[package]]
 name = "bitcoin_slices"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7943d4257fdfc85afe2a13d2b539a5213e97bb978329dd79b624acbce73042fb"
+checksum = "82b80fcc031ed36f91c31639a4d97acb1487985fdee34565651b2f52f4346859"
 dependencies = [
  "bitcoin",
  "bitcoin_hashes",
@@ -203,7 +203,7 @@ dependencies = [
 
 [[package]]
 name = "blocks_iterator"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "bitcoin",
  "bitcoin_slices",
@@ -220,7 +220,7 @@ dependencies = [
 
 [[package]]
 name = "blocks_iterator_cli"
-version = "2.1.1"
+version = "2.1.2"
 dependencies = [
  "bitcoin",
  "bitcoinconsensus 0.20.2-0.5.0",
