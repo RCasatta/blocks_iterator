@@ -12,7 +12,6 @@
 
 use bitcoin::BlockHash;
 use log::{info, Level};
-use std::fs::File;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{sync_channel, SyncSender};
@@ -32,6 +31,7 @@ mod period;
 mod pipe;
 mod stages;
 mod utxo;
+mod xor;
 
 // re-exporting deps
 pub use bitcoin;
@@ -44,6 +44,7 @@ pub use config::Config;
 pub use error::Error;
 pub use iter::iter;
 pub use pipe::PipeIterator;
+pub use xor::XorFile;
 
 /// Before reorder we keep only the position of the block in the file system and data relative
 /// to the block hash, the previous hash and the following hash (populated during reorder phase)
@@ -57,7 +58,7 @@ pub struct FsBlock {
     /// It's a Mutex to allow to be sent between threads but only one thread (reorder) mutably
     /// access to it so there is no contention. (Arc alone isn't enough cause it can't be mutated,
     /// RefCell can be mutated but not sent between threads)
-    pub file: Arc<Mutex<File>>,
+    pub file: Arc<Mutex<XorFile>>,
 
     /// The start position in bytes in the `file` at which the block identified by `hash`
     pub start: usize,
@@ -165,8 +166,10 @@ pub fn periodic_log_level(i: u32, every: u32) -> Level {
 #[cfg(test)]
 mod inner_test {
     use crate::bitcoin::Network;
+    use crate::xor::XorKey;
     use crate::{iterate, Config};
     use bitcoin::Txid;
+    use std::fs;
     use std::str::FromStr;
     use std::sync::mpsc::sync_channel;
     use test_log::test;
@@ -204,6 +207,37 @@ mod inner_test {
 
         assert_eq!(inputs, 448);
         assert_eq!(outputs, 426);
+    }
+
+    #[test]
+    fn test_xored_blk_testnet() {
+        let tempdir = tempfile::TempDir::new().unwrap();
+        let key_bytes = [0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef];
+        let key = XorKey::new(key_bytes);
+        fs::write(tempdir.path().join("xor.dat"), key_bytes).unwrap();
+
+        let mut bytes = fs::read("../blocks/blk-testnet.dat").unwrap();
+        key.apply(0, &mut bytes);
+        fs::write(tempdir.path().join("blk00000.dat"), bytes).unwrap();
+
+        let mut conf = Config::new(tempdir.path(), Network::Testnet);
+        conf.skip_prevout = true;
+        let t1 = Txid::from_str("63375db7e443e491c99bcf46ce49422d05708f83b65335c935dee0a06855ebff")
+            .unwrap();
+        let t2 = Txid::from_str("0280d22f8aaa210b9ec8509067ecc523bf79609d8378cc56196857848cf42ce4")
+            .unwrap();
+        let t3 = Txid::from_str("b3c19d78b4953b694717a47d9852f8ea1ccd4cf93a45ba2e43a0f97d7cdb2655")
+            .unwrap();
+
+        for b in super::iter(conf) {
+            if b.height == 394 {
+                assert_eq!(b.txids(), &vec![t1, t2, t3]);
+                assert_eq!(b.block_total_txs, 3);
+                return;
+            }
+        }
+
+        panic!("expected block at height 394");
     }
 
     #[cfg(feature = "db")]

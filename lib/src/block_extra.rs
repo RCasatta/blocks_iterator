@@ -6,7 +6,6 @@ use bitcoin::Txid;
 use log::debug;
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::io::{Read, Seek, SeekFrom};
 use std::ops::DerefMut;
 use std::sync::OnceLock;
 
@@ -70,11 +69,9 @@ impl TryFrom<FsBlock> for BlockExtra {
             .lock()
             .map_err(|e| err(e.to_string(), &fs_block))?;
         let file = guard.deref_mut();
-        file.seek(SeekFrom::Start(fs_block.start as u64))
-            .map_err(|e| err(e.to_string(), &fs_block))?;
         debug!("going to read: {:?}", file);
         let mut block_bytes = vec![0u8; fs_block.end - fs_block.start];
-        file.read_exact(&mut block_bytes)
+        file.read_exact_at(fs_block.start, &mut block_bytes)
             .map_err(|e| err(e.to_string(), &fs_block))?;
 
         Ok(BlockExtra {

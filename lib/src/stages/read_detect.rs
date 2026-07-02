@@ -1,4 +1,5 @@
 use crate::bitcoin::{BlockHash, Network};
+use crate::xor::{XorFile, XorKey};
 use crate::{FsBlock, Periodic};
 use bitcoin::hashes::Hash;
 use bitcoin::p2p::Magic;
@@ -7,8 +8,6 @@ use bitcoin_slices::{bsl, Parse, Visit};
 use log::info;
 use std::collections::HashSet;
 use std::convert::TryInto;
-use std::fs::File;
-use std::io::Read;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::SyncSender;
@@ -52,7 +51,7 @@ pub struct DetectedBlock {
 }
 
 impl DetectedBlock {
-    fn into_fs_block(self, file: &Arc<Mutex<File>>, serialization_version: u8) -> FsBlock {
+    fn into_fs_block(self, file: &Arc<Mutex<XorFile>>, serialization_version: u8) -> FsBlock {
         FsBlock {
             start: self.start,
             end: self.end,
@@ -84,6 +83,10 @@ impl ReadDetect {
 
                 let mut now = Instant::now();
                 let mut seen = Seen::new();
+                let xor_key = XorKey::read_from(&blocks_dir).unwrap();
+                if xor_key.is_some() {
+                    info!("read blocksdir XOR key");
+                }
                 let mut path = blocks_dir.clone();
                 path.push("blk*.dat");
                 info!("listing block files at {:?}", path);
@@ -96,13 +99,13 @@ impl ReadDetect {
                 let mut busy_time = 0u128;
 
                 for path in paths.into_iter() {
-                    let mut file = File::open(&path).unwrap();
+                    let mut file = XorFile::open(&path, xor_key).unwrap();
                     file.read_to_end(&mut vec).unwrap();
                     let detected_blocks = detect(&vec, network.magic()).unwrap();
                     vec.clear();
                     drop(file);
 
-                    let file = File::open(&path).unwrap();
+                    let file = XorFile::open(&path, xor_key).unwrap();
                     let file = Arc::new(Mutex::new(file));
 
                     let fs_blocks: Vec<_> = detected_blocks
