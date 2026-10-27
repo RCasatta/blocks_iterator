@@ -3,7 +3,6 @@ use bitcoin::blockdata::constants::genesis_block;
 use bitcoin::{BlockHash, Network};
 use log::{info, warn};
 use std::collections::HashMap;
-use std::convert::TryInto;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::SyncSender;
@@ -146,7 +145,7 @@ impl Reorder {
                                 blocks.add(raw_block);
                                 while let Some(block_to_send) = blocks.remove(&next) {
                                     let mut block_extra: BlockExtra =
-                                        block_to_send.try_into().unwrap();
+                                        BlockExtra::from_fs_block(block_to_send).unwrap();
                                     busy_time += now.elapsed().as_nanos();
                                     next = block_extra.next[0];
                                     block_extra.height = height;

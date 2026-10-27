@@ -41,18 +41,9 @@ impl XorKey {
 
 /// A Bitcoin Core block file handle that transparently undoes blocksdir XOR encoding.
 #[derive(Debug)]
-pub struct XorFile {
+pub(crate) struct XorFile {
     file: File,
     xor_key: Option<XorKey>,
-}
-
-impl From<File> for XorFile {
-    fn from(file: File) -> Self {
-        Self {
-            file,
-            xor_key: None,
-        }
-    }
 }
 
 impl XorFile {
