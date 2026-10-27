@@ -9,12 +9,15 @@ Iterates over Bitcoin blocks, decoding data inside Bitcoin Core's blocks directo
 Features:
 * Blocks are returned in height order, it avoids following reorgs (see [`Config::max_reorg`] parameter)
 * Blocks come with extra data [`BlockExtra`] like all block's previous outputs, it allows computing
-transactions fee or [verifying](https://github.com/RCasatta/blocks_iterator/blob/master/cli/examples/verify.rs)
-scripts in the blockchain.
+  transactions fee or [verifying](https://github.com/RCasatta/blocks_iterator/blob/master/cli/examples/verify.rs)
+  scripts in the blockchain.
 
 Note:
 
-Bitcoin Core 28.0 introduced xoring of bitcoin blocks and this project doesn't yet support reading the blocks directory when xored. You can disable xoring in core via `-blocksxor=0`.
+Bitcoin Core 28.0 introduced XOR-obfuscation of the block files (`-blocksxor`, enabled by default).
+The key is read automatically from `xor.dat` in the blocks directory, so XORed blocks directories
+are supported without any extra parameter. A missing `xor.dat` (pre-28.0 node) or an all-zero key
+(`-blocksxor=0`) means the files are read as-is.
 
 
 ## Iteration modes
