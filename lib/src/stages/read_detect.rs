@@ -74,6 +74,7 @@ impl ReadDetect {
         early_stop: Arc<AtomicBool>,
         sender: SyncSender<Option<Vec<FsBlock>>>,
         serialization_version: u8,
+        xor_key: Option<XorKey>,
     ) -> Self {
         let mut periodic = Periodic::new(Duration::from_secs(60));
         let mut vec = Vec::with_capacity(135_000_000);
@@ -83,7 +84,6 @@ impl ReadDetect {
 
                 let mut now = Instant::now();
                 let mut seen = Seen::new();
-                let xor_key = XorKey::read_from(&blocks_dir).unwrap();
                 if xor_key.is_some() {
                     info!("read blocksdir XOR key");
                 }

@@ -43,7 +43,7 @@ pub use log;
 pub use block_extra::BlockExtra;
 pub use config::Config;
 pub use error::Error;
-pub use iter::iter;
+pub use iter::{iter, try_iter};
 pub use pipe::PipeIterator;
 
 /// Before reorder we keep only the position of the block in the file system and data relative
@@ -89,7 +89,11 @@ pub(crate) struct FsBlock {
     pub(crate) block_total_txs: u32,
 }
 
-fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {
+fn iterate(
+    config: Config,
+    xor_key: Option<xor::XorKey>,
+    channel: SyncSender<Option<BlockExtra>>,
+) -> JoinHandle<()> {
     thread::spawn(move || {
         let now = Instant::now();
         let early_stop = Arc::new(AtomicBool::new(false));
@@ -102,6 +106,7 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
             early_stop.clone(),
             send_block_fs,
             config.serialization_version,
+            xor_key,
         );
 
         let (send_ordered_blocks, receive_ordered_blocks) =
@@ -185,7 +190,7 @@ mod inner_test {
 
         let mut inputs = 0;
         let mut outputs = 0;
-        let handle = iterate(conf, send);
+        let handle = iterate(conf, None, send);
         let t1 = Txid::from_str("63375db7e443e491c99bcf46ce49422d05708f83b65335c935dee0a06855ebff")
             .unwrap();
         let t2 = Txid::from_str("0280d22f8aaa210b9ec8509067ecc523bf79609d8378cc56196857848cf42ce4")
@@ -238,6 +243,58 @@ mod inner_test {
         }
 
         panic!("expected block at height 394");
+    }
+
+    fn tempdir_with_xor(xor: &[u8]) -> tempfile::TempDir {
+        let tempdir = tempfile::TempDir::new().unwrap();
+        fs::write(tempdir.path().join("xor.dat"), xor).unwrap();
+        fs::copy(
+            "../blocks/blk-testnet.dat",
+            tempdir.path().join("blk00000.dat"),
+        )
+        .unwrap();
+        tempdir
+    }
+
+    fn count_blocks(conf: Config) -> usize {
+        super::try_iter(conf).unwrap().count()
+    }
+
+    #[test]
+    fn test_missing_xor_key() {
+        let mut conf = test_conf();
+        conf.skip_prevout = true;
+        assert!(!conf.blocks_dir.join("xor.dat").exists());
+        assert_eq!(count_blocks(conf), 395); // 401 blocks minus default max_reorg 6
+    }
+
+    #[test]
+    fn test_zero_xor_key() {
+        let tempdir = tempdir_with_xor(&[0u8; 8]);
+        let mut conf = Config::new(tempdir.path(), Network::Testnet);
+        conf.skip_prevout = true;
+        assert_eq!(count_blocks(conf), 395); // 401 blocks minus default max_reorg 6
+    }
+
+    #[test]
+    fn test_wrong_length_xor_key() {
+        let tempdir = tempdir_with_xor(&[1u8; 3]);
+        let conf = Config::new(tempdir.path(), Network::Testnet);
+        match super::try_iter(conf) {
+            Err(crate::Error::XorKey { path, .. }) => {
+                assert_eq!(path, tempdir.path().join("xor.dat"))
+            }
+            Err(e) => panic!("unexpected error {:?}", e),
+            Ok(_) => panic!("expected error"),
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid blocks dir XOR key")]
+    fn test_wrong_length_xor_key_iter_panics() {
+        let tempdir = tempdir_with_xor(&[1u8; 9]);
+        let conf = Config::new(tempdir.path(), Network::Testnet);
+        let _ = super::iter(conf);
     }
 
     #[cfg(feature = "db")]

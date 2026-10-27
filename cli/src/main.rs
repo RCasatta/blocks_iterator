@@ -3,7 +3,7 @@ use bitcoin::consensus::Encodable;
 use blocks_iterator::Config;
 use clap::Parser;
 use env_logger::Env;
-use log::info;
+use log::{error, info};
 use std::error::Error;
 use std::io;
 use std::io::Write;
@@ -14,7 +14,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let config = Config::parse();
 
-    let blocks_iter = blocks_iterator::iter(config);
+    let blocks_iter = blocks_iterator::try_iter(config).map_err(|e| {
+        error!("{}", e);
+        e
+    })?;
     let mut buffer = [0u8; MAX_VEC_SIZE];
     for block_extra in blocks_iter {
         let size = block_extra.consensus_encode(&mut &mut buffer[..]).unwrap();
