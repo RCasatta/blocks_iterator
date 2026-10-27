@@ -9,9 +9,10 @@ on:
 jobs:
 
   cosmetics:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -19,50 +20,55 @@ jobs:
       - run: cargo clippy -- -D warnings
 
   test:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        toolchain: [stable, nightly, 1.60.0, 1.67.0]
+        # 1.78.0: oldest cargo able to read Cargo.lock v4 (no-default-features)
+        # 1.85.0: required by rocksdb 0.24 (`db` feature), same as rust-toolchain.toml
+        toolchain: [stable, nightly, 1.78.0, 1.85.0]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.toolchain }}
-      - run: |
-          cd lib && cargo update -p tempfile --precise 3.6.0
-        if: ${{ matrix.toolchain == '1.60.0' }}
-      - run: cargo test --no-default-features
-      - run: cargo test --features db,redb,consensus
-        if: ${{ matrix.toolchain == 'stable' || matrix.toolchain == '1.67.0'  }}
+      # use explicit `+toolchain` so rust-toolchain.toml doesn't override the matrix
+      - run: cargo +${{ matrix.toolchain }} test --no-default-features
+      - run: cargo +${{ matrix.toolchain }} test --features db,redb,consensus
+        if: ${{ matrix.toolchain == 'stable' || matrix.toolchain == '1.85.0' }}
       - run: cd benches && cargo +nightly bench
         if: ${{ matrix.toolchain == 'nightly' }}
 
   examples:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         example: ["verify --features consensus,rayon", "signatures_in_witness", "outputs_versions"]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo run --example ${{ matrix.example }} -- --blocks-dir blocks --network testnet
 
   pipe-example:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release --no-default-features
       - run: cargo build --release --examples
       - run: ./target/release/blocks_iterator_cli --blocks-dir blocks --network testnet --max-reorg 40 | ./target/release/examples/with_pipe
+        timeout-minutes: 10
 
   nix:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: cachix/install-nix-action@v25
         with:
           extra_nix_config: |
