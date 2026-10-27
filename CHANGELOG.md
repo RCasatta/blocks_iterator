@@ -16,7 +16,7 @@
 - BREAKING: `FsBlock` is no longer public (it's an internal pipeline type), and the public
   `impl TryFrom<FsBlock> for BlockExtra` is removed with it. `XorFile`, which existed only on
   `master` and was reachable only through `FsBlock::file`, is crate-private.
-- BREAKING: `Error` has the new `XorKey` variant, so exhaustive matches on `Error` need updating.
+- BREAKING: `Error` is now `#[non_exhaustive]` and has the new `XorKey` variant, so matches on `Error` need a wildcard arm.
 - `iter(config)` panics with the error message (instead of panicking inside a pipeline thread)
   when `xor.dat` is invalid.
 - The CLI uses `try_iter` and exits with status 1 on an invalid `xor.dat`.

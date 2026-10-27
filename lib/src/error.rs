@@ -1,4 +1,5 @@
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// The `xor.dat` file in the blocks directory exists but can't be read or has an unexpected
     /// length (it must be 8 bytes)
