@@ -65,6 +65,8 @@ jobs:
       - run: cargo build --release --no-default-features
       - run: cargo build --release --examples
       - run: ./target/release/blocks_iterator_cli --blocks-dir blocks --network testnet --max-reorg 40 | ./target/release/examples/with_pipe
+        # explicit bash enables pipefail, so a failing blocks_iterator_cli fails the step
+        shell: bash
         timeout-minutes: 10
 
   nix:
