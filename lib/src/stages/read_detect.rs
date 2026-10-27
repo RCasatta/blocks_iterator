@@ -116,7 +116,7 @@ impl ReadDetect {
 
                     // TODO if 0 blocks found, maybe wrong directory
                     if periodic.elapsed() {
-                        info!("read {:?}, contains {} blocks", &path, fs_blocks.len());
+                        info!("read {:?}, contains {} blocks", path, fs_blocks.len());
                     }
 
                     busy_time += now.elapsed().as_nanos();
