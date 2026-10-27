@@ -9,8 +9,8 @@ Iterates over Bitcoin blocks, decoding data inside Bitcoin Core's blocks directo
 Features:
 * Blocks are returned in height order, it avoids following reorgs (see [`Config::max_reorg`] parameter)
 * Blocks come with extra data [`BlockExtra`] like all block's previous outputs, it allows computing
-transactions fee or [verifying](https://github.com/RCasatta/blocks_iterator/blob/master/cli/examples/verify.rs)
-scripts in the blockchain.
+  transactions fee or [verifying](https://github.com/RCasatta/blocks_iterator/blob/master/cli/examples/verify.rs)
+  scripts in the blockchain.
 
 Note:
 

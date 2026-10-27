@@ -93,10 +93,7 @@ enum StackScript {
 
 impl StackScript {
     pub fn is_other(&self) -> bool {
-        match self {
-            StackScript::Other(_) => true,
-            _ => false,
-        }
+        matches!(self, StackScript::Other(_))
     }
 }
 

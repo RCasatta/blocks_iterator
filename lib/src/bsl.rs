@@ -3,11 +3,13 @@ use bitcoin_slices::number::{read_u32, read_u8};
 use bitcoin_slices::{bsl, Parse, ParseResult};
 use bitcoin_slices::{SResult, Visit, Visitor};
 
+// Only used in tests for now, see https://github.com/RCasatta/blocks_iterator/issues/81
+#[allow(dead_code)]
 struct BlockExtra<'a> {
     slice: &'a [u8],
 }
 
-impl<'a> AsRef<[u8]> for BlockExtra<'a> {
+impl AsRef<[u8]> for BlockExtra<'_> {
     fn as_ref(&self) -> &[u8] {
         self.slice
     }
