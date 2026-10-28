@@ -47,8 +47,8 @@ pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
     match try_iter(config) {
         Ok(iter) => iter,
         Err(e) => {
-            error!("{}", e);
-            panic!("{}", e)
+            error!("{}", e.display_chain());
+            panic!("{}", e.display_chain())
         }
     }
 }

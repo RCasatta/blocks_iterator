@@ -290,7 +290,8 @@ mod inner_test {
     }
 
     #[test]
-    #[should_panic(expected = "invalid blocks dir XOR key")]
+    // the cause from `source()` must be part of the panic message
+    #[should_panic(expected = "xor.dat\": xor.dat unexpected length: 9")]
     fn test_wrong_length_xor_key_iter_panics() {
         let tempdir = tempdir_with_xor(&[1u8; 9]);
         let conf = Config::new(tempdir.path(), Network::Testnet);
