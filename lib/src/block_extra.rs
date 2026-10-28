@@ -5,7 +5,6 @@ use bitcoin::consensus::serialize;
 use bitcoin::Txid;
 use log::debug;
 use std::collections::HashMap;
-use std::convert::TryFrom;
 use std::ops::DerefMut;
 use std::sync::OnceLock;
 
@@ -59,10 +58,9 @@ pub struct BlockExtra {
     pub(crate) block_total_txs: usize,
 }
 
-impl TryFrom<FsBlock> for BlockExtra {
-    type Error = String;
-
-    fn try_from(fs_block: FsBlock) -> Result<Self, Self::Error> {
+impl BlockExtra {
+    /// Read the block bytes from disk, the other fields are populated by the following stages
+    pub(crate) fn from_fs_block(fs_block: FsBlock) -> Result<Self, String> {
         let err = |e: String, f: &FsBlock| -> String { format!("{:?} {:?}", e, f) };
         let mut guard = fs_block
             .file

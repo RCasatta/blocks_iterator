@@ -12,6 +12,7 @@
 
 use bitcoin::BlockHash;
 use log::{info, Level};
+use xor::XorFile;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{sync_channel, SyncSender};
@@ -42,9 +43,8 @@ pub use log;
 pub use block_extra::BlockExtra;
 pub use config::Config;
 pub use error::Error;
-pub use iter::iter;
+pub use iter::{iter, try_iter};
 pub use pipe::PipeIterator;
-pub use xor::XorFile;
 
 /// Before reorder we keep only the position of the block in the file system and data relative
 /// to the block hash, the previous hash and the following hash (populated during reorder phase)
@@ -52,32 +52,32 @@ pub use xor::XorFile;
 ///  to read the block from disk again, but by doing so we will avoid using too much
 /// memory in the `OutOfOrderBlocks` map.
 #[derive(Debug)]
-pub struct FsBlock {
+pub(crate) struct FsBlock {
     /// the file the block identified by `hash` is stored in. Multiple blocks are stored in the
     /// and we don't want to open/close the file many times for performance reasons so it's shared.
     /// It's a Mutex to allow to be sent between threads but only one thread (reorder) mutably
     /// access to it so there is no contention. (Arc alone isn't enough cause it can't be mutated,
     /// RefCell can be mutated but not sent between threads)
-    pub file: Arc<Mutex<XorFile>>,
+    pub(crate) file: Arc<Mutex<XorFile>>,
 
     /// The start position in bytes in the `file` at which the block identified by `hash`
-    pub start: usize,
+    pub(crate) start: usize,
 
     /// The end position in bytes in the `file` at which the block identified by `hash`
-    pub end: usize,
+    pub(crate) end: usize,
 
     /// The hash identifying this block, output of `block.header.block_hash()`
-    pub hash: BlockHash,
+    pub(crate) hash: BlockHash,
 
     /// The hash of the block previous to this one, `block.header.prev_blockhash`
-    pub prev: BlockHash,
+    pub(crate) prev: BlockHash,
 
     /// The hash of the blocks following this one. It is populated during the reorder phase, it can
     /// be more than one because of reorgs.
-    pub next: Vec<BlockHash>,
+    pub(crate) next: Vec<BlockHash>,
 
     /// The serialization format to use when trasformed to `BlockExtra` (0 or 1)
-    pub serialization_version: u8,
+    pub(crate) serialization_version: u8,
 
     /// Total number of transaction inputs in this block
     pub(crate) block_total_inputs: u32,
@@ -89,7 +89,11 @@ pub struct FsBlock {
     pub(crate) block_total_txs: u32,
 }
 
-fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandle<()> {
+fn iterate(
+    config: Config,
+    xor_key: Option<xor::XorKey>,
+    channel: SyncSender<Option<BlockExtra>>,
+) -> JoinHandle<()> {
     thread::spawn(move || {
         let now = Instant::now();
         let early_stop = Arc::new(AtomicBool::new(false));
@@ -102,6 +106,7 @@ fn iterate(config: Config, channel: SyncSender<Option<BlockExtra>>) -> JoinHandl
             early_stop.clone(),
             send_block_fs,
             config.serialization_version,
+            xor_key,
         );
 
         let (send_ordered_blocks, receive_ordered_blocks) =
@@ -185,7 +190,7 @@ mod inner_test {
 
         let mut inputs = 0;
         let mut outputs = 0;
-        let handle = iterate(conf, send);
+        let handle = iterate(conf, None, send);
         let t1 = Txid::from_str("63375db7e443e491c99bcf46ce49422d05708f83b65335c935dee0a06855ebff")
             .unwrap();
         let t2 = Txid::from_str("0280d22f8aaa210b9ec8509067ecc523bf79609d8378cc56196857848cf42ce4")
@@ -238,6 +243,58 @@ mod inner_test {
         }
 
         panic!("expected block at height 394");
+    }
+
+    fn tempdir_with_xor(xor: &[u8]) -> tempfile::TempDir {
+        let tempdir = tempfile::TempDir::new().unwrap();
+        fs::write(tempdir.path().join("xor.dat"), xor).unwrap();
+        fs::copy(
+            "../blocks/blk-testnet.dat",
+            tempdir.path().join("blk00000.dat"),
+        )
+        .unwrap();
+        tempdir
+    }
+
+    fn count_blocks(conf: Config) -> usize {
+        super::try_iter(conf).unwrap().count()
+    }
+
+    #[test]
+    fn test_missing_xor_key() {
+        let mut conf = test_conf();
+        conf.skip_prevout = true;
+        assert!(!conf.blocks_dir.join("xor.dat").exists());
+        assert_eq!(count_blocks(conf), 395); // 401 blocks minus default max_reorg 6
+    }
+
+    #[test]
+    fn test_zero_xor_key() {
+        let tempdir = tempdir_with_xor(&[0u8; 8]);
+        let mut conf = Config::new(tempdir.path(), Network::Testnet);
+        conf.skip_prevout = true;
+        assert_eq!(count_blocks(conf), 395); // 401 blocks minus default max_reorg 6
+    }
+
+    #[test]
+    fn test_wrong_length_xor_key() {
+        let tempdir = tempdir_with_xor(&[1u8; 3]);
+        let conf = Config::new(tempdir.path(), Network::Testnet);
+        match super::try_iter(conf) {
+            Err(crate::Error::XorKey { path, .. }) => {
+                assert_eq!(path, tempdir.path().join("xor.dat"))
+            }
+            Err(e) => panic!("unexpected error {:?}", e),
+            Ok(_) => panic!("expected error"),
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid blocks dir XOR key")]
+    fn test_wrong_length_xor_key_iter_panics() {
+        let tempdir = tempdir_with_xor(&[1u8; 9]);
+        let conf = Config::new(tempdir.path(), Network::Testnet);
+        let _ = super::iter(conf);
     }
 
     #[cfg(feature = "db")]

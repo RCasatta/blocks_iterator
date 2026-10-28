@@ -5,7 +5,8 @@ use std::{
 
 use log::error;
 
-use crate::{iterate, BlockExtra, Config};
+use crate::xor::XorKey;
+use crate::{iterate, BlockExtra, Config, Error};
 
 struct BlockExtraIterator {
     handle: Option<JoinHandle<()>>,
@@ -37,12 +38,30 @@ impl Iterator for BlockExtraIterator {
 /// Return an Iterator of [`BlockExtra`] read from `blocks*.dat` contained in the `config.blocks_dir`
 /// Blocks returned are iterated in order, starting from the genesis to the highest block
 /// (minus `config.max_reorg`) in the directory, unless `config.stop_at_height` is specified.
+///
+/// # Panics
+///
+/// If the blocks directory contains a `xor.dat` that can't be read or is invalid, use
+/// [`try_iter`] to handle the error.
 pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
+    match try_iter(config) {
+        Ok(iter) => iter,
+        Err(e) => {
+            error!("{}", e);
+            panic!("{}", e)
+        }
+    }
+}
+
+/// Like [`iter`] but returns an error instead of panicking when the iteration can't start, for
+/// example because the blocks directory contains an invalid `xor.dat`.
+pub fn try_iter(config: Config) -> Result<impl Iterator<Item = BlockExtra>, Error> {
+    let xor_key = XorKey::read_from(&config.blocks_dir)?;
     let (send, recv) = sync_channel(config.channels_size.into());
 
-    let handle = Some(iterate(config, send));
+    let handle = Some(iterate(config, xor_key, send));
 
-    BlockExtraIterator { handle, recv }
+    Ok(BlockExtraIterator { handle, recv })
 }
 
 #[cfg(test)]
