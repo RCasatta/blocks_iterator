@@ -27,7 +27,7 @@ log = { workspace = true }
 rayon = { version = "1.5.0", optional = true }
 
 [dev-dependencies]
-bitcoinconsensus = { version = "0.20.2-0.5.0" }
+bitcoinconsensus = { version = "0.105.0" }
 
 [[example]]
 name = "with_pipe"
