@@ -89,7 +89,7 @@ impl ReadDetect {
                 }
                 let mut path = blocks_dir.clone();
                 path.push("blk*.dat");
-                info!("listing block files at {:?}", path);
+                info!("listing block files at {path:?}");
                 let mut paths: Vec<PathBuf> = glob::glob(path.to_str().unwrap())
                     .unwrap()
                     .map(|r| r.unwrap())

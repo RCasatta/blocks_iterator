@@ -122,12 +122,7 @@ mod test {
             let err = XorKey::read_from(tempdir.path()).unwrap_err();
             match err {
                 crate::Error::XorKey { source, .. } => {
-                    assert_eq!(
-                        source.kind(),
-                        std::io::ErrorKind::InvalidData,
-                        "len {}",
-                        len
-                    )
+                    assert_eq!(source.kind(), std::io::ErrorKind::InvalidData, "len {len}")
                 }
                 e => panic!("unexpected error {:?}", e),
             }

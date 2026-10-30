@@ -28,10 +28,7 @@ impl Fee {
     ) -> Self {
         Self {
             join: Some(std::thread::spawn(move || {
-                info!(
-                    "starting fee processer. start_at_height:{}",
-                    start_at_height
-                );
+                info!("starting fee processer. start_at_height:{start_at_height}");
                 let mut now = Instant::now();
                 let mut busy_time = 0u128;
                 let mut total_txs = 0u64;

@@ -36,7 +36,7 @@ impl DbUtxo {
             .map(i32::from_ne_bytes)
             .unwrap_or(-1);
 
-        info!("DB updated_height: {}", updated_up_to_height);
+        info!("DB updated_height: {updated_up_to_height}");
 
         Ok(DbUtxo {
             db,
