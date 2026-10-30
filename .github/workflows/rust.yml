@@ -18,6 +18,10 @@ jobs:
           components: rustfmt, clippy
       - run: cargo fmt -- --check
       - run: cargo clippy -- -D warnings
+      # rocksdb's bindgen needs libclang, which ubuntu-24.04 images don't ship
+      - run: sudo apt-get update && sudo apt-get install -y libclang-dev
+      - run: cargo clippy --all-targets --features db,redb,consensus -- -D warnings
+      - run: cargo clippy -p blocks_iterator_cli --all-targets --features consensus,rayon -- -D warnings
 
   test:
     runs-on: ubuntu-24.04
