@@ -25,9 +25,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 1.78.0: oldest cargo able to read Cargo.lock v4 (no-default-features)
-        # 1.85.0: required by rocksdb 0.24 (`db` feature), same as rust-toolchain.toml
-        toolchain: [stable, nightly, 1.78.0, 1.85.0]
+        # 1.85.0: MSRV, required by bitcoin_slices 0.13 and rocksdb 0.24 (`db` feature),
+        # same as rust-toolchain.toml
+        toolchain: [stable, nightly, 1.85.0]
 
     steps:
       - uses: actions/checkout@v4
