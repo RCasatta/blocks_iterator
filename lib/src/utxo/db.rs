@@ -124,7 +124,7 @@ impl UtxoStore for DbUtxo {
                         v.script_pubkey.len(),
                         k
                     );
-                    batch.put(&outpoint_buffer[..], &serialize(&v));
+                    batch.put(&outpoint_buffer[..], serialize(&v));
                 }
                 self.inserted_outputs += 1;
             }
