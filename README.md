@@ -130,4 +130,5 @@ The `1.0` is not to be intended as *battle-tested production-ready* library, the
 
 ## MSRV
 
-Check minimum rust version run in CI, as of Oct 2026 is `1.85.0`, with or without features.
+The minimum supported Rust version is `1.88.0`, with or without features (`rust-version` in
+`Cargo.toml`, checked in CI).

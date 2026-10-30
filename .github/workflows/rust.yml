@@ -25,9 +25,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 1.85.0: MSRV, required by bitcoin_slices 0.13 and rocksdb 0.24 (`db` feature),
-        # same as rust-toolchain.toml
-        toolchain: [stable, nightly, 1.85.0]
+        # 1.88.0: MSRV (`rust-version` in Cargo.toml), same as rust-toolchain.toml
+        toolchain: [stable, nightly, 1.88.0]
 
     steps:
       - uses: actions/checkout@v4
@@ -38,9 +37,9 @@ jobs:
       - run: cargo +${{ matrix.toolchain }} test --no-default-features
       # rocksdb's bindgen needs libclang, which ubuntu-24.04 images don't ship
       - run: sudo apt-get update && sudo apt-get install -y libclang-dev
-        if: ${{ matrix.toolchain == 'stable' || matrix.toolchain == '1.85.0' }}
+        if: ${{ matrix.toolchain == 'stable' || matrix.toolchain == '1.88.0' }}
       - run: cargo +${{ matrix.toolchain }} test --features db,redb,consensus
-        if: ${{ matrix.toolchain == 'stable' || matrix.toolchain == '1.85.0' }}
+        if: ${{ matrix.toolchain == 'stable' || matrix.toolchain == '1.88.0' }}
       - run: cd benches && cargo +nightly bench
         if: ${{ matrix.toolchain == 'nightly' }}
 
