@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+Patch-compatible with 3.0.0: no public API change (checked with `cargo semver-checks`), MSRV
+unchanged (Rust 1.78 without default features, 1.85 with the `db` feature).
+
+### Changed
+
+- Dependencies: `thiserror` 1 -> 2 (only used via `#[derive(Error)]`), `rand` 0.8 -> 0.10 (only
+  pulled in by the `db` feature, which already requires Rust 1.85), cli dev-dependency
+  `bitcoinconsensus` 0.20.2-0.5.0 -> 0.105.0 (the version `bitcoin` 0.32 uses, so the `verify`
+  example builds a single copy of libbitcoinconsensus).
+- `cargo update` (Rust 1.78 compatible).
+
+### Fixed
+
+- Dependency advisory RUSTSEC-2026-0418 (libz-sys 1.1.30 -> 1.1.31, used by rocksdb).
+
 ## Release 3.0.0 - 2026-10-28
 
 ### Added
