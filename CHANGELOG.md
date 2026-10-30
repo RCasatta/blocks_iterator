@@ -2,8 +2,13 @@
 
 ## Unreleased
 
-Suggested version: 3.1.0. No public API change (checked with `cargo semver-checks`), but the MSRV
-goes up to Rust 1.88.
+Suggested version: 4.0.0, because of the rocksdb bump below (without it: 3.1.0, no public API
+change, checked with `cargo semver-checks`). The MSRV goes up to Rust 1.88.
+
+### Breaking
+
+- `db` feature: rocksdb 0.24 -> 0.25 (RocksDB 10.4.2 -> 11.8.1). `Error::Rocksdb` wraps
+  `rocksdb::Error` from rocksdb 0.25, a different type from 0.24's.
 
 ### Changed
 
