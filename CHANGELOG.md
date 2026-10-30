@@ -2,16 +2,21 @@
 
 ## Unreleased
 
-Patch-compatible with 3.0.0: no public API change (checked with `cargo semver-checks`), MSRV
-unchanged (Rust 1.78 without default features, 1.85 with the `db` feature).
+Minor-compatible with 3.0.0 (suggested 3.1.0): no public API change (checked with
+`cargo semver-checks`), but the MSRV without default features goes from Rust 1.78 to 1.85.
 
 ### Changed
 
+- MSRV: Rust 1.85 with or without features (was 1.78 without default features), required by
+  `bitcoin_slices` 0.12+ (sha2 0.11).
+- Dependencies: `bitcoin_slices` 0.11.0 -> 0.13.0 (sha2 0.10 -> 0.11, stricter length checks,
+  segwit marker no longer triggers visitor callbacks). No code changes needed; the `redb` feature
+  still uses redb 1.x, so `Error::Redb` wraps the same type.
 - Dependencies: `thiserror` 1 -> 2 (only used via `#[derive(Error)]`), `rand` 0.8 -> 0.10 (only
   pulled in by the `db` feature, which already requires Rust 1.85), cli dev-dependency
   `bitcoinconsensus` 0.20.2-0.5.0 -> 0.105.0 (the version `bitcoin` 0.32 uses, so the `verify`
   example builds a single copy of libbitcoinconsensus).
-- `cargo update` (Rust 1.78 compatible).
+- `cargo update` (Rust 1.85 compatible: clap 4.6, rayon 1.12).
 
 ### Fixed
 
