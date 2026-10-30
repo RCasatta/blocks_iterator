@@ -52,7 +52,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             version,
                             block_extra.height()
                         );
-                        info!("{}", log_line);
+                        info!("{log_line}");
                         output_file.write_all(log_line.as_bytes()).unwrap();
                         output_file.write_all(b"\n").unwrap();
                     }
@@ -60,6 +60,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     }
-    info!("counters: {:?}", counters);
+    info!("counters: {counters:?}");
     Ok(())
 }

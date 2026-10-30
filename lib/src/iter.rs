@@ -25,7 +25,7 @@ impl Iterator for BlockExtraIterator {
                 None
             }
             Err(e) => {
-                error!("error iterating {:?}", e);
+                error!("error iterating {e:?}");
                 if let Some(handle) = self.handle.take() {
                     handle.join().unwrap();
                 }
@@ -47,7 +47,7 @@ pub fn iter(config: Config) -> impl Iterator<Item = BlockExtra> {
     match try_iter(config) {
         Ok(iter) => iter,
         Err(e) => {
-            error!("{}", e);
+            error!("{e}");
             panic!("{}", e)
         }
     }

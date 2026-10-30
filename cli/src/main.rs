@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = Config::parse();
 
     let blocks_iter = blocks_iterator::try_iter(config).map_err(|e| {
-        error!("{}", e);
+        error!("{e}");
         e
     })?;
     let mut buffer = [0u8; MAX_VEC_SIZE];

@@ -55,11 +55,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         for (txid, tx) in block_extra.iter_tx() {
             if tx.output.len() > most_output.1 {
-                info!("New most_output tx: {}", txid);
+                info!("New most_output tx: {txid}");
                 most_output = (*txid, tx.output.len());
             }
             if tx.weight() > heaviest.1 {
-                info!("New heaviest tx: {}", txid);
+                info!("New heaviest tx: {txid}");
                 heaviest = (*txid, tx.weight());
             }
         }
@@ -70,10 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         block_most_tx.1, block_most_tx.0
     );
 
-    info!(
-        "total missing reward: {} in {} blocks",
-        total_missing_reward, blocks_missing_reward
-    );
+    info!("total missing reward: {total_missing_reward} in {blocks_missing_reward} blocks");
 
     info!(
         "most_output tx is {} with #outputs: {}",
