@@ -52,7 +52,7 @@ impl ComputeTxids {
                         None => break,
                     }
                 }
-                info!("ending compute tx ids busy time: {:?}", busy_time,);
+                info!("ending compute tx ids busy time: {busy_time:?}",);
                 sender.send(None).expect("augment: cannot send none");
             })),
         }

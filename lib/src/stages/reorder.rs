@@ -139,7 +139,7 @@ impl Reorder {
                                     for block in blocks.blocks.values() {
                                         println!("{} {:?}", block.hash, block.next);
                                     }
-                                    println!("next: {}", next);
+                                    println!("next: {next}");
                                     panic!("Reorder map grow more than {}", max_block_to_reorder);
                                 }
                                 blocks.add(raw_block);
@@ -160,7 +160,7 @@ impl Reorder {
                                             "# {:7} {}",
                                             block_extra.height, block_extra.block_hash,
                                         );
-                                        info!("{}", stats);
+                                        info!("{stats}");
                                     }
                                     sender.send(Some(block_extra)).unwrap();
 
@@ -169,7 +169,7 @@ impl Reorder {
                                     last_height = height;
                                     if let Some(stop_at_height) = stop_at_height {
                                         if height > stop_at_height {
-                                            info!("reached height: {}", stop_at_height);
+                                            info!("reached height: {stop_at_height}");
                                             early_stop.store(true, Ordering::Relaxed);
                                             break 'outer;
                                         }

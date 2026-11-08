@@ -48,8 +48,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     }
     info!(
-        "signatures_in_witness: {} blocks_with_witness: {}",
-        signatures_in_witness, blocks_with_witness
+        "signatures_in_witness: {signatures_in_witness} blocks_with_witness: {blocks_with_witness}"
     );
     Ok(())
 }

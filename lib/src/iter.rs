@@ -25,7 +25,7 @@ impl Iterator for BlockExtraIterator {
                 None
             }
             Err(e) => {
-                error!("error iterating {:?}", e);
+                error!("error iterating {e:?}");
                 if let Some(handle) = self.handle.take() {
                     handle.join().unwrap();
                 }

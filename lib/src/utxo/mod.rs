@@ -37,7 +37,7 @@ pub enum AnyUtxo {
     Db(db::DbUtxo),
     Mem(MemUtxo),
     #[cfg(feature = "redb")]
-    Redb(redb::RedbUtxo),
+    Redb(Box<redb::RedbUtxo>),
 }
 
 impl UtxoStore for AnyUtxo {

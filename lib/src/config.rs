@@ -89,7 +89,7 @@ impl Config {
     pub(crate) fn utxo_manager(&self) -> Result<crate::utxo::AnyUtxo, crate::Error> {
         use crate::utxo::{self, AnyUtxo};
         Ok(match &self.utxo_redb {
-            Some(path) => AnyUtxo::Redb(utxo::RedbUtxo::new(path)?),
+            Some(path) => AnyUtxo::Redb(Box::new(utxo::RedbUtxo::new(path)?)),
             None => AnyUtxo::Mem(utxo::MemUtxo::new(self.network)),
         })
     }
@@ -107,7 +107,7 @@ impl Config {
         Ok(match (&self.utxo_db, &self.utxo_redb) {
             (Some(_), Some(_)) => return Err(crate::Error::OneDb),
             (Some(path), None) => AnyUtxo::Db(utxo::DbUtxo::new(path)?),
-            (None, Some(path)) => AnyUtxo::Redb(utxo::RedbUtxo::new(path)?),
+            (None, Some(path)) => AnyUtxo::Redb(Box::new(utxo::RedbUtxo::new(path)?)),
             (None, None) => AnyUtxo::Mem(utxo::MemUtxo::new(self.network)),
         })
     }

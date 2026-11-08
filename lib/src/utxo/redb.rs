@@ -46,7 +46,7 @@ impl RedbUtxo {
             result.map(|a| a.value()).unwrap_or(-1)
         };
 
-        info!("DB updated_height: {}", updated_up_to_height);
+        info!("DB updated_height: {updated_up_to_height}");
 
         Ok(RedbUtxo {
             db,

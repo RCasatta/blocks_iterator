@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased
+
+Suggested version: 4.0.0, because of the rocksdb bump below (without it: 3.1.0, no public API
+change, checked with `cargo semver-checks`). The MSRV goes up to Rust 1.88.
+
+### Breaking
+
+- `db` feature: rocksdb 0.24 -> 0.25 (RocksDB 10.4.2 -> 11.8.1). `Error::Rocksdb` wraps
+  `rocksdb::Error` from rocksdb 0.25, a different type from 0.24's.
+
+### Changed
+
+- MSRV: Rust 1.88 with or without features (was 1.78 without default features, 1.85 with the
+  `db` feature), now declared as `rust-version` in `Cargo.toml`.
+- Dependencies: `bitcoin_slices` 0.11.0 -> 0.13.0 (sha2 0.10 -> 0.11, stricter length checks,
+  segwit marker no longer triggers visitor callbacks). No code changes needed; the `redb` feature
+  still uses redb 1.x, so `Error::Redb` wraps the same type.
+- Dependencies: `thiserror` 1 -> 2 (only used via `#[derive(Error)]`), `rand` 0.8 -> 0.10 (only
+  pulled in by the `db` feature), cli dev-dependency `bitcoinconsensus` 0.20.2-0.5.0 -> 0.105.0
+  (the version `bitcoin` 0.32 uses, so the `verify` example builds a single copy of
+  libbitcoinconsensus).
+- `cargo update` (Rust 1.88 compatible: clap 4.6, rayon 1.12, sha2 0.11.1).
+- The deprecated `periodic_log_level(i, every)` no longer panics when `every` is 0.
+- CI: clippy also runs with all features and on all targets.
+
+### Fixed
+
+- Dependency advisory RUSTSEC-2026-0418 (libz-sys 1.1.30 -> 1.1.31, used by rocksdb).
+- clippy errors with the `db` and `redb` features and with clippy 1.88.
+
 ## Release 3.0.0 - 2026-10-28
 
 ### Added

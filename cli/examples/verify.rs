@@ -63,8 +63,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .collect();
 
     for (data, e) in errors {
-        error!("{:?}", e);
-        error!("{:?}", data);
+        error!("{e:?}");
+        error!("{data:?}");
         let tx: Transaction = deserialize(&data.spending).unwrap();
         error!("tx: {}", tx.compute_txid());
     }

@@ -61,13 +61,13 @@ pub struct BlockExtra {
 impl BlockExtra {
     /// Read the block bytes from disk, the other fields are populated by the following stages
     pub(crate) fn from_fs_block(fs_block: FsBlock) -> Result<Self, String> {
-        let err = |e: String, f: &FsBlock| -> String { format!("{:?} {:?}", e, f) };
+        let err = |e: String, f: &FsBlock| -> String { format!("{e:?} {f:?}") };
         let mut guard = fs_block
             .file
             .lock()
             .map_err(|e| err(e.to_string(), &fs_block))?;
         let file = guard.deref_mut();
-        debug!("going to read: {:?}", file);
+        debug!("going to read: {file:?}");
         let mut block_bytes = vec![0u8; fs_block.end - fs_block.start];
         file.read_exact_at(fs_block.start, &mut block_bytes)
             .map_err(|e| err(e.to_string(), &fs_block))?;
