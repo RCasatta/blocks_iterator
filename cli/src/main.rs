@@ -14,10 +14,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let config = Config::parse();
 
-    let blocks_iter = blocks_iterator::try_iter(config).map_err(|e| {
-        error!("{}", e);
-        e
-    })?;
+    let blocks_iter = match blocks_iterator::try_iter(config) {
+        Ok(iter) => iter,
+        Err(e) => {
+            error!("{}", e.display_chain());
+            std::process::exit(1);
+        }
+    };
     let mut buffer = [0u8; MAX_VEC_SIZE];
     for block_extra in blocks_iter {
         let size = block_extra.consensus_encode(&mut &mut buffer[..]).unwrap();
