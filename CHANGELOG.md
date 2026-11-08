@@ -40,6 +40,8 @@ change, checked with `cargo semver-checks`). The MSRV goes up to Rust 1.88.
 - `try_iter(config)`: like `iter(config)` but returns `Result`, so an invalid `xor.dat` can be
   handled by the caller.
 - `Error::XorKey { path, source }`, returned when `xor.dat` can't be read or isn't 8 bytes long.
+  Its `Display` doesn't include the cause, which is its `source()`.
+- `Error::display_chain()`, to display an error followed by its causes.
 
 ### Changed
 
