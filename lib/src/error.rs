@@ -40,7 +40,7 @@ impl fmt::Display for DisplayChain<'_> {
         write!(f, "{}", self.0)?;
         let mut source = std::error::Error::source(self.0);
         while let Some(s) = source {
-            write!(f, ": {}", s)?;
+            write!(f, ": {s}")?;
             source = s.source();
         }
         Ok(())
