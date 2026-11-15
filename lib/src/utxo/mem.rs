@@ -3,7 +3,7 @@ use crate::utxo::{Hash64, UtxoStore};
 use crate::BlockExtra;
 use bitcoin::hashes::Hash;
 use bitcoin::{Amount, OutPoint, PubkeyHash, ScriptBuf, ScriptHash, TxOut, WPubkeyHash};
-use fxhash::FxHashMap;
+use rustc_hash::FxHashMap;
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hasher};
 

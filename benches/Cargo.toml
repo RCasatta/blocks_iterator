@@ -9,7 +9,7 @@ edition = "2021"
 # blocks_iterator = { path = ".." }
 bitcoin = "0.30.1"
 blake3 = "1.4.1"
-fxhash = "0.2.1"
+rustc-hash = "2.1"
 rocksdb = "0.21.0"
 sha2 = "0.10.7"
 tempfile = "3.7.0"
