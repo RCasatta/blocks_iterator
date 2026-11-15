@@ -36,7 +36,6 @@ mod xor;
 
 // re-exporting deps
 pub use bitcoin;
-pub use fxhash;
 pub use glob;
 pub use log;
 

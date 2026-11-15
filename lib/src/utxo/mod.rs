@@ -16,6 +16,8 @@ pub use redb::RedbUtxo;
 use bitcoin::OutPoint;
 #[cfg(feature = "db")]
 pub use db::DbUtxo;
+use rustc_hash::FxBuildHasher;
+use std::hash::BuildHasher;
 
 pub trait UtxoStore {
     /// Add all the outputs (except provably unspenof all the transaction in the block in the `UtxoStore`
@@ -64,6 +66,6 @@ impl UtxoStore for AnyUtxo {
 
 impl Hash64 for OutPoint {
     fn hash64(&self) -> u64 {
-        fxhash::hash64(self)
+        FxBuildHasher.hash_one(self)
     }
 }

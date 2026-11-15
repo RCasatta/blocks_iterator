@@ -6,7 +6,9 @@ use bitcoin::hashes::sha256::Midstate;
 use bitcoin::hashes::{sha256, Hash, HashEngine};
 use bitcoin::OutPoint;
 use rocksdb::{Options, WriteBatch, DB};
+use rustc_hash::FxBuildHasher;
 use sha2::{Digest, Sha256};
+use std::hash::BuildHasher;
 use test::{black_box, Bencher};
 
 #[bench]
@@ -100,13 +102,14 @@ fn bench_sha2_crate_long(b: &mut Bencher) {
 }
 
 #[bench]
-fn bench_fxhash(b: &mut Bencher) {
+fn bench_rustc_hash(b: &mut Bencher) {
     let outpoint = OutPoint::default();
     let salt = [0u8; 12];
 
     b.iter(|| {
-        let a = fxhash::hash32(&(&outpoint, &salt));
-        let b = fxhash::hash64(&(&outpoint, &salt));
+        // rustc-hash 2 has no 32 bit variant: take the lower 32 bits of a 64 bit hash
+        let a = FxBuildHasher.hash_one(&(&outpoint, &salt)) as u32;
+        let b = FxBuildHasher.hash_one(&(&outpoint, &salt));
         let mut result = [0u8; 12];
 
         result[..4].copy_from_slice(&a.to_ne_bytes()[..]);
