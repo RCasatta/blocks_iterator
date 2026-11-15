@@ -209,7 +209,7 @@ dependencies = [
 
 [[package]]
 name = "blocks_iterator"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "bitcoin",
  "bitcoin_slices",
@@ -226,7 +226,7 @@ dependencies = [
 
 [[package]]
 name = "blocks_iterator_cli"
-version = "3.0.0"
+version = "4.0.0"
 dependencies = [
  "bitcoin",
  "bitcoinconsensus",

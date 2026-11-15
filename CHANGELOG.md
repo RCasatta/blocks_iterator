@@ -1,14 +1,18 @@
 # Changelog
 
-## Unreleased
+## Release 4.0.0 - 2026-11-15
 
-Suggested version: 4.0.0, because of the rocksdb bump below (without it: 3.1.0, no public API
-change, checked with `cargo semver-checks`). The MSRV goes up to Rust 1.88.
+Major version because of the breaking changes below. The MSRV goes up to Rust 1.88.
 
 ### Breaking
 
 - `db` feature: rocksdb 0.24 -> 0.25 (RocksDB 10.4.2 -> 11.8.1). `Error::Rocksdb` wraps
   `rocksdb::Error` from rocksdb 0.25, a different type from 0.24's.
+- `fxhash` (unmaintained, RUSTSEC-2025-0057) is replaced by `rustc-hash` 2 as a private
+  dependency, and the re-export `blocks_iterator::fxhash` is removed without replacement.
+  Downstream users of it should depend on `fxhash` or `rustc-hash` directly. No other public API
+  exposes the hasher. Hash values change, which is invisible because they are only used for the
+  in-memory UTXO map.
 
 ### Changed
 
@@ -28,6 +32,7 @@ change, checked with `cargo semver-checks`). The MSRV goes up to Rust 1.88.
 ### Fixed
 
 - Dependency advisory RUSTSEC-2026-0418 (libz-sys 1.1.30 -> 1.1.31, used by rocksdb).
+- Dependency advisory RUSTSEC-2025-0057 (`fxhash` unmaintained), see Breaking.
 - clippy errors with the `db` and `redb` features and with clippy 1.88.
 
 ## Release 3.0.0 - 2026-10-28
